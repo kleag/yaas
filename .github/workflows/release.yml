@@ -1,0 +1,60 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install pyinstaller
+        run: pip install pyinstaller
+
+      - name: Build executable with pyinstaller
+        run: pyinstaller --onefile --name yaas src/yaas.py
+
+      - name: Download Inno Setup
+        uses: crazy-max/ghaction-inno-setup@v1
+        with:
+          version: 6.1.2
+
+      - name: Create installer with Inno Setup
+        run: iscc yaas.iss
+
+      - name: Upload installer as artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: yaas_installer
+          path: yaas_installer.exe
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: yaas_installer
+          path: .
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: yaas_installer.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
