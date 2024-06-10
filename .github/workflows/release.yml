@@ -18,6 +18,16 @@ jobs:
         with:
           python-version: '3.x'
 
+      - name: Install Inno Setup
+        run: |
+          curl -o innosetup.exe https://jrsoftware.org/download.php/is.exe
+          innosetup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /DIR="C:\InnoSetup"
+        shell: powershell
+
+      - name: Add Inno Setup to PATH
+        run: echo "::add-path::C:\InnoSetup"
+        shell: powershell
+
       - name: Install dependencies
         run: pip install -r requirements.txt
 
@@ -26,16 +36,6 @@ jobs:
 
       - name: Build executable with pyinstaller
         run: pyinstaller --onefile --name yaas src/yaas.py
-
-      - name: Install Inno Setup
-        run: |
-          curl -L -o innosetup.exe https://jrsoftware.org/download.php/is.exe
-          innosetup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /DIR="C:\InnoSetup"
-        shell: powershell
-
-      - name: Add Inno Setup to PATH
-        run: echo "::add-path::C:\InnoSetup"
-        shell: powershell
 
       - name: Create installer with Inno Setup
         run: C:\InnoSetup\iscc.exe inno_setup_script.iss
