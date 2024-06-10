@@ -39,7 +39,7 @@ keywords = ["audio", "video", "track", "split", "gui", "qt"]
 Homepage = "https://github.com/kleag/yaas"
 
 [project.scripts]
-yaas = "src.yaas:main"
+yaas = "yaas:main"
 
 
 
