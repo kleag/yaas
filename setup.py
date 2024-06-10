@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="Audio Splitter",
+    name="yaas",
     version="0.1.0",
     packages=find_packages(),
     install_requires=[
