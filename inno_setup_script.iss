@@ -4,7 +4,7 @@
 [Setup]
 AppId={{YOUR-GUID-HERE}}
 AppName=Yaas
-AppVersion=0.1.3
+AppVersion=0.1.4
 AppPublisher=Gaël de Chalendar
 AppPublisherURL=https://github.com/kleag/yaas
 AppContact=kleagg@gmail.com
