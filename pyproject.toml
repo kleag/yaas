@@ -63,8 +63,6 @@ push = true
     'version = "{version}"'
 ]
 "src/__init__.py" = ["{version}"]
-"README.md" = [
-    "{version}",
-    "{pep440_version}",
-]
+"README.md" = ["{version}"]
+"inno_setup_script.iss" = ['AppVersion={version}']
 
