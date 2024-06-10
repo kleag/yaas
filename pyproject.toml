@@ -1,0 +1,70 @@
+# pyproject.toml
+
+[build-system]
+requires = ["setuptools>=68.2.2", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "yaas"
+version = "0.1.1"
+description = "A tool to split video soundtracks into separate tracks using OpenUnmix"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Gaël de Chalendar", email = "kleagg@gmail.com" }
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+    "Operating System :: OS Independent",
+    "Topic :: Multimedia :: Sound/Audio",
+    "Topic :: Multimedia :: Sound/Audio :: Capture/Recording",
+    "Topic :: Multimedia :: Sound/Audio :: Conversion",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Multimedia :: Video :: Conversion"
+]
+requires-python = ">=3.9"
+dependencies = [
+    "PySide6",
+    "pydub",
+    "torch",
+    "torchaudio",
+    "openunmix",
+    "pytube",
+    "moviepy"
+]
+keywords = ["audio", "video", "track", "split", "gui", "qt"]
+
+[project.urls]
+Homepage = "https://github.com/kleag/yaas"
+
+[project.scripts]
+yaas = "src.yaas:main"
+
+
+
+
+
+
+[tool.bumpver]
+current_version = "0.1.1"
+version_pattern = "MAJOR.MINOR.PATCH"
+commit_message = "Bump version {old_version} -> {new_version}"
+tag_message = "{new_version}"
+tag_scope = "default"
+pre_commit_hook = ""
+post_commit_hook = ""
+commit = true
+tag = true
+push = true
+
+[tool.bumpver.file_patterns]
+"pyproject.toml" = [
+    'version = "{version}"'
+]
+"src/__init__.py" = ["{version}"]
+"README.md" = [
+    "{version}",
+    "{pep440_version}",
+]
+
