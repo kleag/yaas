@@ -27,13 +27,18 @@ jobs:
       - name: Build executable with pyinstaller
         run: pyinstaller --onefile --name yaas src/yaas.py
 
-      - name: Download Inno Setup
-        uses: crazy-max/ghaction-inno-setup@v1
-        with:
-          version: 6.1.2
+      - name: Install Inno Setup
+        run: |
+          curl -L -o innosetup.exe https://jrsoftware.org/download.php/is.exe
+          innosetup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /DIR="C:\InnoSetup"
+        shell: powershell
+
+      - name: Add Inno Setup to PATH
+        run: echo "::add-path::C:\InnoSetup"
+        shell: powershell
 
       - name: Create installer with Inno Setup
-        run: iscc yaas.iss
+        run: C:\InnoSetup\iscc.exe inno_setup_script.iss
 
       - name: Upload installer as artifact
         uses: actions/upload-artifact@v2
@@ -57,4 +62,3 @@ jobs:
           files: yaas_installer.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
