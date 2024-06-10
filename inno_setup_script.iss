@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 [Setup]
-AppId={{YOUR-GUID-HERE}}
+AppId=51bf107a-58a8-4256-82db-d1bb714a8423
 AppName=Yaas
 AppVersion=0.1.4
 AppPublisher=Gaël de Chalendar
