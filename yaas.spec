@@ -1,6 +1,9 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-block_cipher = None
+from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT, BUNDLE
+
+# block_cipher = None
 
 a = Analysis(
     ['src/yaas.py'],
@@ -13,11 +16,11 @@ a = Analysis(
     excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
-    cipher=block_cipher,
 )
+#     cipher=block_cipher,
 
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 
 exe = EXE(
     pyz,
@@ -34,12 +37,12 @@ exe = EXE(
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
 )
+#     disable_windowed_traceback=False,
+#     argv_emulation=False,
+#     target_arch=None,
+#     codesign_identity=None,
+#     entitlements_file=None,
 
 
 coll = COLLECT(
@@ -56,7 +59,8 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='yaas',
-    icon=None,
-    bundle_identifier=None,
-    version=None,
+    format='onefile'
 )
+#     icon=None,
+#     bundle_identifier=None,
+#     version=None,
