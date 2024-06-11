@@ -1,9 +1,13 @@
+# runtime requirements
 PySide6 
 openunmix
 torch
-twine==3.4.1
-setuptools>=54.0.0
 pytube==10.9.2
 moviepy==1.0.3
-wheel>=0.31.0
 pydub
+ffmpeg
+
+# setup requirements
+setuptools>=54.0.0
+twine==3.4.1
+wheel>=0.31.0
