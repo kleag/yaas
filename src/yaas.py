@@ -1,9 +1,10 @@
 import argparse
 import sys
 import os
-from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel,
-                               QLineEdit, QPushButton, QTextEdit, QMessageBox)
-from PySide6.QtCore import (Qt, QThread, Signal, Slot)
+from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
+                               QLabel, QLineEdit, QPushButton, QTextEdit,
+                               QMessageBox)
+from PySide6.QtCore import (Qt, QThread, Signal, Slot, QStandardPaths, QDir)
 import subprocess
 from pytube import YouTube, Playlist
 from pydub import AudioSegment
@@ -22,12 +23,20 @@ class Worker(QThread):
     update_status = Signal(str)
     ex_exit = Signal(BaseException, int)
     extraction_done = Signal()
-    extraction_failed = Signal()
+    extraction_failed = Signal(str)
 
     def __init__(self, url, out):
         super().__init__()
+        # Get the writable location for application data
+        self.app_data_path = QStandardPaths.writableLocation(
+            QStandardPaths.AppDataLocation)
+
+        # Ensure the directory exists
+        QDir().mkpath(self.app_data_path)
+
         self.url = url
         self.out = out
+        QDir().mkpath(self.out)
 
     def run(self):
         self.update_status.emit("Downloading audio...")
@@ -40,23 +49,22 @@ class Worker(QThread):
         self.update_status.emit(f"Converting {mp3_path} to {flac_path}...")
         self.convert_to_flac(mp3_path, flac_path)
         self.update_status.emit(f"Converted to FLAC: {flac_path}")
-
+        os.remove(mp3_path)
         self.update_status.emit("Extracting tracks...")
         self.extract_tracks(flac_path)
         self.update_status.emit("Extraction complete")
+        os.remove(flac_path)
 
     def download_audio(self, url):
         filename = ""
         try:
-            if not os.path.exists(self.out):
-                os.mkdir(self.out)
-                self.update_status.emit('Output directory created')
-
             if is_valid_video_url(url):
-                self.update_status.emit('Single YouTube video Detected. Initializing...')
+                self.update_status.emit(
+                    'Single YouTube video Detected. Initializing...')
 
                 video = YouTube(url)
-                config = Config(out_dir=self.out, timeout=5000, max_retries=3)
+                config = Config(out_dir=self.app_data_path, timeout=5000,
+                                max_retries=3)
                 path = download_mp3(video, config)
 
                 self.update_status.emit('Converting video to MP3 File...')
@@ -65,24 +73,26 @@ class Worker(QThread):
 
                 self.update_status.emit('Conversion complete...')
             elif is_valid_playlist_url(url):
-                self.update_status.emit('YouTube playlist Detected. Initializing...')
+                self.update_status.emit(
+                    'YouTube playlist Detected. Initializing...')
 
                 playlist = Playlist(url)
-                for video in playlist.videos:
+                for i, video in enumerate(playlist.videos):
                     path = download_mp3(video, config)
 
-                    self.update_status.emit(f'Converting video {video} to MP3 File...')
+                    self.update_status.emit(
+                        f'Converting video {i} to MP3 File...')
 
                     filename = convert_mp4_to_mp3(path)
 
-                    self.update_status.emit('Conversion complete. Moving on to next...')
-                self.update_status.emit(
-                    f'All videos converted. Enjoy your new MP3 files in {config.out_dir}!')
+                    self.update_status.emit(
+                        'Conversion complete. Moving on to next...')
+                self.update_status.emit(f'All videos converted.')
             else:
-                raise ValueError('The given url is not a valid YouTube link')
+                self.extraction_failed.emit(
+                    'The given url is not a valid YouTube link')
         except BaseException as ex:
-            self.ex_exit.emit(ex, 1)
-
+            self.extraction_failed.emit(str(ex))
 
         return filename
 
@@ -91,7 +101,7 @@ class Worker(QThread):
             audio = AudioSegment.from_mp3(mp3_path)
             audio.export(flac_path, format="flac")
         except BaseException as ex:
-            self.ex_exit.emit(ex, 1)
+            self.extraction_failed.emit(str(ex))
 
     def extract_tracks(self, flac_path):
         try:
@@ -119,18 +129,20 @@ class Worker(QThread):
 
             # Save each estimated source
             for source, estimate in estimates.items():
-                output_path = f"{os.path.splitext(flac_path)[0]}_{source}.wav"
+                # Extract the file name without the extension
+                file_name = os.path.splitext(os.path.basename(flac_path))[0]
+                # Create the new path
+                wav_path = os.path.join(self.out, f"{file_name}_{source}.wav")
+
                 torchaudio.save(
-                    output_path,
+                    wav_path,
                     torch.squeeze(estimate).to("cpu"),
                     sample_rate= sample_rate,
                 )
+                self.update_status.emit(f'Wrote {source} to {wav_path}')
             self.extraction_done.emit()
         except BaseException as ex:
-            self.extraction_failed.emit()
-            # self.ex_exit.emit(ex, 1)
-
-
+            self.extraction_failed.emit(str(ex))
 
 
 class MainWindow(QWidget):
@@ -170,8 +182,9 @@ class MainWindow(QWidget):
         description = 'Youtube To MP3 Download Tool'
         parser = argparse.ArgumentParser(description=description)
 
-        parser.add_argument('-o', '--out', metavar="DIR", type=str, default='mp3',
-                            help="The directory in which to store the downloaded MP3 files.")
+        parser.add_argument(
+            '-o', '--out', metavar="DIR", type=str, default='mp3',
+            help="The directory in which to store the downloaded MP3 files.")
 
         return parser.parse_args()
 
