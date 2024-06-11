@@ -33,7 +33,7 @@ jobs:
             # Download Inno Setup
             Invoke-WebRequest -Uri https://jrsoftware.org/download.php/is.exe -OutFile is.exe
             # Install Inno Setup
-            Start-Process is.exe -ArgumentList '/VERYSILENT' /SUPPRESSMSGBOXES /NORESTART /SP- -NoNewWindow -Wait
+            Start-Process is.exe -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-'  -NoNewWindow -Wait
 
       - name: Install dependencies
         run: pip install -r requirements.txt
