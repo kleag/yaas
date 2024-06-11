@@ -1,9 +1,9 @@
 import argparse
 import sys
 import os
-from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QLabel,
+from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel,
                                QLineEdit, QPushButton, QTextEdit, QMessageBox)
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import (Qt, QThread, Signal, Slot)
 import subprocess
 from pytube import YouTube, Playlist
 from pydub import AudioSegment
@@ -17,9 +17,12 @@ from yturl2mp3.config import Config
 from yturl2mp3.helpers import (convert_mp4_to_mp3, download_mp3,
                                is_valid_playlist_url, is_valid_video_url)
 
+
 class Worker(QThread):
     update_status = Signal(str)
     ex_exit = Signal(BaseException, int)
+    extraction_done = Signal()
+    extraction_failed = Signal()
 
     def __init__(self, url, out):
         super().__init__()
@@ -122,8 +125,10 @@ class Worker(QThread):
                     torch.squeeze(estimate).to("cpu"),
                     sample_rate= sample_rate,
                 )
+            self.extraction_done.emit()
         except BaseException as ex:
-            self.ex_exit.emit(ex, 1)
+            self.extraction_failed.emit()
+            # self.ex_exit.emit(ex, 1)
 
 
 
@@ -177,6 +182,10 @@ class MainWindow(QWidget):
             self.worker = Worker(url, self.args.out)
             self.worker.update_status.connect(self.update_status)
             self.worker.ex_exit.connect(self.ex_exit)
+            # Change the cursor to busy
+            QApplication.setOverrideCursor(Qt.WaitCursor)
+            self.worker.extraction_done.connect(self.extraction_done)
+            self.worker.extraction_failed.connect(self.extraction_failed)
             self.worker.start()
 
     def update_status(self, message):
@@ -195,6 +204,24 @@ class MainWindow(QWidget):
                     "Fatal Error",
                     f"Exception: {ex}.")
         sys.exit(exit_code)
+
+    @Slot()
+    def extraction_done(self):
+        # Restore the cursor to normal
+        QApplication.restoreOverrideCursor()
+
+        # Optional: Notify the user that the operation has finished
+        self.update_status("Extraction done")
+
+    @Slot()
+    def extraction_failed(self):
+        # Restore the cursor to normal
+        QApplication.restoreOverrideCursor()
+
+        # Optional: Notify the user that the operation has finished
+        self.update_status("Extraction failed")
+
+
 
 def main():
     app = QApplication(sys.argv)
