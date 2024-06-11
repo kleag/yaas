@@ -42,7 +42,7 @@ jobs:
         run: pip install pyinstaller
 
       - name: Build executable with pyinstaller
-        run: pyinstaller --onefile --windowed --name yaas src/yaas.py
+        run: pyinstaller --onefile --windowed yaas.spec
 
       # - name: Create installer with Inno Setup
       #   run: C:\InnoSetup\iscc.exe inno_setup_script.iss
