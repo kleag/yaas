@@ -28,7 +28,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    exclude_binaries=True,
+    exclude_binaries=False,
     name='yaas',
     debug=False,
     bootloader_ignore_signals=False,
@@ -38,6 +38,7 @@ exe = EXE(
     runtime_tmpdir=None,
     console=False,
 )
+#     exclude_binaries=True,
 #     disable_windowed_traceback=False,
 #     argv_emulation=False,
 #     target_arch=None,
@@ -56,11 +57,11 @@ coll = COLLECT(
     name='yaas',
 )
 
-app = BUNDLE(
-    coll,
-    name='yaas',
-    format='onefile'
-)
+# app = BUNDLE(
+#     coll,
+#     name='yaas',
+#     format='onefile'
+# )
 #     icon=None,
 #     bundle_identifier=None,
 #     version=None,
