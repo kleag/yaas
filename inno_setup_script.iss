@@ -22,7 +22,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "build\yaas\yaas.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\yaas.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\Yaas"; Filename: "{app}\yaas.exe"
