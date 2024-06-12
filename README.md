@@ -17,7 +17,10 @@ Just run
 yaas
 ```
 
-Paste the URL of a YouTube video, wait, and then use the generated audio files.
+Search the video from which you want to extract the sound tracks using the
+integrated browser, click the Start button, wait, and then use the generated
+audio files.
+
 Note that you must respect the copyright of the authors. E.g., If they don't
 authorize sharing, you must keep your private copy for you.
 
