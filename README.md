@@ -24,6 +24,15 @@ audio files.
 Note that you must respect the copyright of the authors. E.g., If they don't
 authorize sharing, you must keep your private copy for you.
 
+## Building and distributing
+
+```bash
+git commit
+bumpver update --patch
+python -m build
+twine upload dist/*
+```
+
 ## Author
 
 Gaël de Chalendar, aka Kleag
@@ -33,3 +42,5 @@ This program is free software, licensed under the Mozilla Public License 2.0
 (MPL 2.0) license (see the LICENSE file). It includes most of the
 youtube-to-mp3 project (https://github.com/cedricouellet/youtube-to-mp3),
 itself under the MPL license.
+
+
