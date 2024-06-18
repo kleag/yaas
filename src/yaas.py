@@ -15,7 +15,7 @@ from worker import Worker
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
-
+        initial_url= "https://www.youtube.com"
         self.args = self.parse_args()
 
         self.setWindowTitle("YouTube Audio Splitter")
@@ -23,16 +23,18 @@ class MainWindow(QWidget):
 
         self.layout = QVBoxLayout()
 
-        # self.label = QLabel("Enter YouTube URL:")
-        # self.layout.addWidget(self.label)
-        #
-        # self.url_input = QLineEdit()
-        # self.layout.addWidget(self.url_input)
+        self.label = QLabel("Enter YouTube URL:")
+        self.layout.addWidget(self.label)
+
+        self.url_input = QLineEdit(initial_url)
+        self.layout.addWidget(self.url_input)
+        self.url_input.editingFinished.connect(self.url_changed)
 
         self.browser = QWebEngineView()
         self.browser.settings().setAttribute(QWebEngineSettings.JavascriptEnabled, True)
-        self.browser.setUrl("https://www.youtube.com")
+        self.browser.setUrl(initial_url)
         self.browser.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.browser.urlChanged.connect(self.update_line_edit)
         self.layout.addWidget(self.browser)
 
         self.start_button = QPushButton("Start")
@@ -46,6 +48,10 @@ class MainWindow(QWidget):
 
         self.setLayout(self.layout)
 
+
+    def update_line_edit(self, url):
+        # Convert QUrl to string and set the text of QLineEdit
+        self.url_input.setText(url.toString())
 
     def parse_args(self) -> argparse.Namespace:
         """
@@ -93,6 +99,10 @@ class MainWindow(QWidget):
                     "Fatal Error",
                     f"Exception: {ex}.")
         sys.exit(exit_code)
+
+    @Slot()
+    def url_changed(self):
+        self.browser.setUrl(self.url_input.text())
 
     @Slot()
     def extraction_done(self):
