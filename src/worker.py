@@ -34,9 +34,9 @@ class Worker(QThread):
         QDir().mkpath(self.out)
 
     def run(self):
-        self.update_status.emit("Downloading audio...")
         mp3_path = self.download_audio(self.url)
         if not mp3_path:
+            self.update_status.emit(f"Failed to download {self.url}")
             return
         self.update_status.emit(f"Downloaded: {mp3_path}")
 
@@ -51,6 +51,7 @@ class Worker(QThread):
         os.remove(flac_path)
 
     def download_audio(self, url):
+        self.update_status.emit(f"Downloading audio from {url}...")
         filename = ""
         try:
             if is_valid_video_url(url):
@@ -62,11 +63,11 @@ class Worker(QThread):
                                 max_retries=3)
                 path = download_mp3(video, config)
 
-                self.update_status.emit('Converting video to MP3 File...')
+                self.update_status.emit(f'Converting video {path} to MP3 File...')
 
                 filename = convert_mp4_to_mp3(path)
 
-                self.update_status.emit('Conversion complete...')
+                self.update_status.emit(f'Conversion complete... Result: {filename}')
             elif is_valid_playlist_url(url):
                 self.update_status.emit(
                     'YouTube playlist Detected. Initializing...')
@@ -87,18 +88,20 @@ class Worker(QThread):
                 self.extraction_failed.emit(
                     'The given url is not a valid YouTube link')
         except BaseException as ex:
-            self.extraction_failed.emit(str(ex))
+            self.extraction_failed.emit(f"Downloading audio failed with: {str(ex)}")
 
         return filename
 
     def convert_to_flac(self, mp3_path, flac_path):
+        self.update_status.emit(f"Converting mp3 {mp3_path} to flac {flac_path}...")
         try:
             audio = AudioSegment.from_mp3(mp3_path)
             audio.export(flac_path, format="flac")
         except BaseException as ex:
-            self.extraction_failed.emit(str(ex))
+            self.extraction_failed.emit(f"Conversion to flac failed: {str(ex)}")
 
     def extract_tracks(self, flac_path):
+        self.update_status.emit(f"Extracting tracks from flac {flac_path}...")
         try:
             # Load the model
             model = openunmix.umxl()
@@ -137,6 +140,6 @@ class Worker(QThread):
                 self.update_status.emit(f'Wrote {source} to {wav_path}')
             self.extraction_done.emit()
         except BaseException as ex:
-            self.extraction_failed.emit(str(ex))
+            self.extraction_failed.emit(f"Tracks extraction failed with: {str(ex)}")
 
 

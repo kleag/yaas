@@ -43,10 +43,6 @@ Homepage = "https://github.com/kleag/yaas"
 yaas = "yaas:main"
 
 
-
-
-
-
 [tool.bumpver]
 current_version = "0.2.0"
 version_pattern = "MAJOR.MINOR.PATCH"

@@ -1,6 +1,7 @@
 import argparse
-import sys
 import os
+import sys
+
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QLabel, QLineEdit, QPushButton, QTextEdit,
                                QMessageBox, QSizePolicy)
@@ -102,12 +103,13 @@ class MainWindow(QWidget):
         self.update_status("Extraction done")
 
     @Slot()
-    def extraction_failed(self):
+    def extraction_failed(self, message: str):
         # Restore the cursor to normal
         QApplication.restoreOverrideCursor()
 
         # Optional: Notify the user that the operation has finished
-        self.update_status("Extraction failed")
+        print(f"Extraction failed: {message}", file=sys.stderr)
+        self.update_status(f"Extraction failed: {message}")
 
 
 
