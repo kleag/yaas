@@ -28,6 +28,8 @@ class Worker(QThread):
 
         # Ensure the directory exists
         QDir().mkpath(self.app_data_path)
+        self.update_status.emit(f'Created app_data_path {self.app_data_path}')
+        print(f'Created app_data_path {self.app_data_path}', file=sys.stderr)
 
         self.url = url
         self.out = out
@@ -61,6 +63,7 @@ class Worker(QThread):
                 video = YouTube(url)
                 config = Config(out_dir=self.app_data_path, timeout=5000,
                                 max_retries=3)
+                self.update_status.emit(f"Downloading audio to {self.app_data_path}...")
                 path = download_mp3(video, config)
 
                 self.update_status.emit(f'Converting video {path} to MP3 File...')
