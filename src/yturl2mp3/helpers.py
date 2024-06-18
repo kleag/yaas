@@ -7,6 +7,7 @@ import os
 from moviepy import editor
 from pytube import YouTube
 
+from pathlib import Path
 
 YOUTUBE_URL = 'https://www.youtube.com'
 
@@ -24,12 +25,12 @@ def download_mp3(video: YouTube, config: Config) -> str:
     stream.download(output_path=config.out_dir, timeout=config.timeout,
                     max_retries=config.max_retries,
                     skip_existing=True)
-    mp4_path = config.out_dir + '/' + stream.default_filename
-    return mp4_path
+    mp4_path = Path(config.out_dir) / stream.default_filename
+    return str(mp4_path)
 
 
 def convert_mp4_to_mp3(path: str, delete_after: bool = True) -> str:
-    """
+    """pyt
     Converts an mp4 file to an mp3 file
 
     :param path: The path of the mp4 file
