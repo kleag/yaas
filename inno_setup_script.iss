@@ -4,7 +4,7 @@
 [Setup]
 AppId=51bf107a-58a8-4256-82db-d1bb714a8423
 AppName=Yaas
-AppVersion=0.2.4
+AppVersion=0.2.5
 AppPublisher=Gaël de Chalendar
 AppPublisherURL=https://github.com/kleag/yaas
 AppContact=kleagg@gmail.com
