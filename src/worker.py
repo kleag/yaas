@@ -2,7 +2,7 @@ import argparse
 import sys
 import os
 from PySide6.QtCore import (QThread, Signal, QStandardPaths, QDir)
-from pytube import YouTube, Playlist
+from pytubefix import YouTube, Playlist
 from pydub import AudioSegment
 import torch
 import torchaudio

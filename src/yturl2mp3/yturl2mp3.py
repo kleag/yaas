@@ -10,7 +10,7 @@ from colorama import Fore
 from typing import NoReturn
 from .config import Config
 from .helpers import convert_mp4_to_mp3, download_mp3, is_valid_playlist_url, is_valid_video_url
-from pytube import YouTube, Playlist
+from pytubefix import YouTube, Playlist
 
 colorama.init()
 

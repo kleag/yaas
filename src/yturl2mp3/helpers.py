@@ -5,7 +5,7 @@ from .config import Config
 import re
 import os
 from moviepy import editor
-from pytube import YouTube
+from pytubefix import YouTube
 
 from pathlib import Path
 

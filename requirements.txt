@@ -2,7 +2,7 @@
 PySide6 
 openunmix
 torch
-pytube==10.9.2
+pytubefix==6.1.2
 moviepy==1.0.3
 pydub
 ffmpeg
