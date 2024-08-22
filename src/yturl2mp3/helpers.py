@@ -22,11 +22,13 @@ def download_mp3(video: YouTube, config: Config) -> str:
     """
     # returns the mp4 only containing audio
     stream = video.streams.get_lowest_resolution()
-    stream.download(output_path=config.out_dir, timeout=config.timeout,
-                    max_retries=config.max_retries,
-                    skip_existing=True)
+    path_to_saved = stream.download(
+        output_path=config.out_dir, timeout=config.timeout,
+        max_retries=config.max_retries,
+        skip_existing=True)
+    path_to_saved = os.path.realpath(path_to_saved)
     mp4_path = Path(config.out_dir) / stream.default_filename
-    return str(mp4_path)
+    return path_to_saved
 
 
 def convert_mp4_to_mp3(path: str, delete_after: bool = True) -> str:
@@ -41,7 +43,7 @@ def convert_mp4_to_mp3(path: str, delete_after: bool = True) -> str:
     mp4 = editor.VideoFileClip(path)
 
     mp3 = mp4.audio
-    mp3.write_audiofile(mp3_path, verbose=False, logger=None)
+    mp3.write_audiofile(mp3_path, verbose=True, logger=None)
 
     mp3.close()
     mp4.close()

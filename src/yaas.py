@@ -74,8 +74,7 @@ class MainWindow(QWidget):
         url = self.browser.url().url()
         if url:
             self.update_status(f"Splitting sound track of {url}")
-            self.worker = Worker(url, self.args.out)
-            self.worker.update_status.connect(self.update_status)
+            self.worker = Worker(url, self)
             self.worker.ex_exit.connect(self.ex_exit)
             # Change the cursor to busy
             QApplication.setOverrideCursor(Qt.WaitCursor)
@@ -124,6 +123,7 @@ class MainWindow(QWidget):
 
 
 def main():
+    os.environ["QTWEBENGINE_DISABLE_SANDBOX"] = "1"
     app = QApplication(sys.argv)
 
     main_window = MainWindow()

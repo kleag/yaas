@@ -20,8 +20,9 @@ class Worker(QThread):
     extraction_done = Signal()
     extraction_failed = Signal(str)
 
-    def __init__(self, url, out):
+    def __init__(self, url, yaas):
         super().__init__()
+        self.update_status.connect(yaas.update_status)
         # Get the writable location for application data
         self.app_data_path = QStandardPaths.writableLocation(
             QStandardPaths.AppDataLocation)
@@ -32,7 +33,7 @@ class Worker(QThread):
         print(f'Created app_data_path {self.app_data_path}', file=sys.stderr)
 
         self.url = url
-        self.out = out
+        self.out = yaas.args.out
         QDir().mkpath(self.out)
 
     def run(self):
@@ -53,7 +54,7 @@ class Worker(QThread):
         os.remove(flac_path)
 
     def download_audio(self, url):
-        self.update_status.emit(f"Downloading audio from {url}...")
+        self.update_status.emit(f"Downloading audio from {url} ...")
         filename = ""
         try:
             if is_valid_video_url(url):
@@ -63,7 +64,7 @@ class Worker(QThread):
                 video = YouTube(url)
                 config = Config(out_dir=self.app_data_path, timeout=5000,
                                 max_retries=3)
-                self.update_status.emit(f"Downloading audio to {self.app_data_path}...")
+                self.update_status.emit(f"Downloading audio to {self.app_data_path} ...")
                 path = download_mp3(video, config)
 
                 self.update_status.emit(f'Converting video {path} to MP3 File...')
