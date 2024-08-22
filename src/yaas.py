@@ -5,9 +5,11 @@ import sys
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QLabel, QLineEdit, QPushButton, QTextEdit,
                                QMessageBox, QSizePolicy)
-from PySide6.QtCore import (Qt, Slot)
+from PySide6.QtCore import (Qt, QStandardPaths, Slot)
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings
+from PySide6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
+
 from typing import NoReturn
 
 from worker import Worker
@@ -31,6 +33,9 @@ class MainWindow(QWidget):
         self.url_input.editingFinished.connect(self.url_changed)
 
         self.browser = QWebEngineView()
+        # Set up a persistent profile
+        self.setup_persistent_profile()
+
         self.browser.settings().setAttribute(QWebEngineSettings.JavascriptEnabled, True)
         self.browser.setUrl(initial_url)
         self.browser.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -47,6 +52,23 @@ class MainWindow(QWidget):
         self.layout.addWidget(self.status_output)
 
         self.setLayout(self.layout)
+
+
+    def setup_persistent_profile(self):
+        # Create a custom profile with a persistent storage path
+        storage_path = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
+        storage_path = os.path.realpath(storage_path)
+        profile = QWebEngineProfile("yaas", self)
+
+        # Optionally, set persistent cookies policy
+        profile.setPersistentCookiesPolicy(
+            QWebEngineProfile.ForcePersistentCookies)
+
+        # Create a new page with the custom profile
+        page = QWebEnginePage(profile, self.browser)
+
+        # Set this page for the QWebEngineView
+        self.browser.setPage(page)
 
 
     def update_line_edit(self, url):
