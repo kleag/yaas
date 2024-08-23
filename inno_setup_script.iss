@@ -11,7 +11,7 @@ AppContact=kleagg@gmail.com
 DefaultDirName={autopf}\YAAS
 DefaultGroupName=Yaas
 OutputDir=.
-OutputBaseFilename=yaas_installer
+OutputBaseFilename=yaas_installer-{#SetupSetting("AppVersion")}
 Compression=lzma
 SolidCompression=yes
 
