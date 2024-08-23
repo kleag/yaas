@@ -9,6 +9,8 @@ using OpenUnmix.
 pip install yaas
 ```
 
+If you are under Windows, you will have to ensure to have a working python installation and to have ffmpeg installed.
+
 ## Usage
 
 Just run

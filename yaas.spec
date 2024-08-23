@@ -10,7 +10,7 @@ a = Analysis(
     pathex=['.'],
     binaries=[],
     datas=[],
-    hiddenimports=['PySide6', 'pytube', 'pydub', 'torch', 'torchaudio', 'openunmix', 'moviepy', 'ffmpeg'],
+    hiddenimports=['PySide6', 'pytubefix', 'pydub', 'torch', 'torchaudio', 'openunmix', 'moviepy', 'ffmpeg', 'PySoundFile'],
     hookspath=[],
     runtime_hooks=[],
     excludes=[],
@@ -18,7 +18,6 @@ a = Analysis(
     win_private_assemblies=False,
 )
 #     cipher=block_cipher,
-
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 

@@ -14,6 +14,14 @@ from typing import NoReturn
 
 from worker import Worker
 
+try:
+    from ctypes import windll  # Only exists on Windows.
+    myappid = 'kleag.yaas.0'
+    windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+except ImportError:
+    pass
+
+
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
