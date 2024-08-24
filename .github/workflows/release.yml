@@ -72,9 +72,6 @@ jobs:
         # run: pyinstaller --onefile --windowed yaas.spec
         run: pyinstaller yaas.spec
 
-      # - name: Create installer with Inno Setup
-      #   run: C:\InnoSetup\iscc.exe inno_setup_script.iss
-
       - name: Build Installer
         run: |
             # Run the Inno Setup script
@@ -84,7 +81,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: yaas_installer
-          path: yaas_installer-$VERSION.exe
+          path: D:\a\yaas\yaas\yaas_installer.exe
 
   release:
     needs: build
@@ -108,13 +105,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install toml
 
-      # Step 4: Retrieve version from pyproject.toml
-      - name: Get version from pyproject.toml
-        id: get_version
-        run: |
-          VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
-          echo "Version is $VERSION"
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
+      # # Step 4: Retrieve version from pyproject.toml
+      # - name: Get version from pyproject.toml
+      #   id: get_version
+      #   run: |
+      #     VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
+      #     echo "Version is $VERSION"
+      #     echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Download artifact
         uses: actions/download-artifact@v2
@@ -137,8 +134,8 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./yaas_installer-$VERSION.exe
-          asset_name: yaas_installer-$VERSION.exe
+          asset_path: ./yaas_installer.exe
+          asset_name: yaas_installer.exe
           asset_content_type: application/vnd.microsoft.portable-executable
 
 
