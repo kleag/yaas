@@ -12,7 +12,7 @@ from PySide6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
 
 from typing import NoReturn
 
-from worker import Worker
+from .worker import Worker
 
 try:
     from ctypes import windll  # Only exists on Windows.
