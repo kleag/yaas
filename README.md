@@ -35,6 +35,14 @@ python -m build
 twine upload dist/*
 ```
 
+
+### Under Windows
+
+```
+pyinstaller .\yaas.spec
+ & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' .\inno_setup_script.iss
+```
+
 ## Author
 
 Gaël de Chalendar, aka Kleag

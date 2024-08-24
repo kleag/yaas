@@ -41,7 +41,7 @@ keywords = ["audio", "video", "track", "split", "gui", "qt"]
 Homepage = "https://github.com/kleag/yaas"
 
 [project.scripts]
-yaas = "yaas.yaas:main"
+yaas = "yaas.app:main"
 
 
 [tool.bumpver]
