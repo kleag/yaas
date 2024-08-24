@@ -6,7 +6,7 @@ from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT, BUNDLE
 # block_cipher = None
 
 a = Analysis(
-    ['src/yaas.py'],
+    ['src/yaas/yaas.py'],
     pathex=['.'],
     binaries=[],
     datas=[],

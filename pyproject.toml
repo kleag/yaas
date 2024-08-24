@@ -41,7 +41,7 @@ keywords = ["audio", "video", "track", "split", "gui", "qt"]
 Homepage = "https://github.com/kleag/yaas"
 
 [project.scripts]
-yaas = "yaas:main"
+yaas = "yaas.yaas:main"
 
 
 [tool.bumpver]
@@ -60,7 +60,7 @@ push = true
 "pyproject.toml" = [
     'version = "{version}"'
 ]
-"src/__init__.py" = ["{version}"]
+"src/yaas/__init__.py" = ["{version}"]
 "README.md" = ["{version}"]
 "inno_setup_script.iss" = ['AppVersion={version}']
 
