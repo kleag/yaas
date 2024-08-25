@@ -45,16 +45,6 @@ jobs:
         with:
           python-version: '3.x'
 
-      # - name: Install Inno Setup
-      #   run: |
-      #     curl -o C:\innosetup.exe https://jrsoftware.org/download.php/is.exe
-      #     c:\innosetup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP- /DIR="C:\InnoSetup"
-      #   shell: powershell
-      #
-      # - name: Add Inno Setup to PATH
-      #   run: echo "C:\InnoSetup" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-      #   shell: powershell
-
       - name: Set up Inno Setup
         run: |
             # Download Inno Setup
@@ -69,7 +59,6 @@ jobs:
         run: pip install pyinstaller
 
       - name: Build executable with pyinstaller
-        # run: pyinstaller --onefile --windowed yaas.spec
         run: pyinstaller yaas.spec
 
       - name: Build Installer
@@ -82,13 +71,13 @@ jobs:
         with:
           name: yaas_installer
           path: D:\a\yaas\yaas\yaas_installer.exe
-      - name: Start Border0 in case of failure.
-#        if: failure()
-        uses: borderzero/gh-action@v2
-        with:
-          token: ${{ secrets.BORDER0_ADMIN_TOKEN }}
-#          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          wait-for: 20‍
+#       - name: Start Border0 in case of failure.
+# #        if: failure()
+#         uses: borderzero/gh-action@v2
+#         with:
+#           token: ${{ secrets.BORDER0_ADMIN_TOKEN }}
+# #          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+#           wait-for: 20‍
   release:
     needs: build
     runs-on: ubuntu-latest
