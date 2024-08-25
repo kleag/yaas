@@ -5,6 +5,13 @@ using OpenUnmix.
 
 ## Installation
 
+### Using the installer
+
+If you are under Windows and don’t know how to use pip (see below), you can use the latest `yaas_installer.exe` in https://github.com/kleag/yaas/releases
+
+
+### Using pip
+
 ```bash
 pip install yaas
 ```
@@ -13,11 +20,21 @@ If you are under Windows, you will have to ensure to have a working python insta
 
 ## Usage
 
+### Starting the application
+
+#### When installed with the Windows installer
+
+Search yaas in your installed applications and start it.
+
+#### When installed with pip
+
 Just run
 
 ```
 yaas
 ```
+
+### Using Yaas
 
 Search the video from which you want to extract the sound tracks using the
 integrated browser, click the Start button, wait, and then use the generated
