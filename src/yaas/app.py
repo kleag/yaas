@@ -55,6 +55,11 @@ class MainWindow(QWidget):
         self.start_button.clicked.connect(self.start_process)
         self.layout.addWidget(self.start_button)
 
+        self.stop_button = QPushButton("Stop")
+        self.stop_button.clicked.connect(self.stop_process)
+        self.layout.addWidget(self.stop_button)
+        self.stop_button.hide()
+        
         self.status_output = QTextEdit()
         self.status_output.setReadOnly(True)
         self.status_output.setFixedHeight(70)  # Approximately 3 lines
@@ -100,7 +105,6 @@ class MainWindow(QWidget):
 
         return parser.parse_args()
 
-
     def start_process(self):
         # url = self.url_input.text()
         url = self.browser.url().url()
@@ -113,10 +117,19 @@ class MainWindow(QWidget):
             self.worker.extraction_done.connect(self.extraction_done)
             self.worker.extraction_failed.connect(self.extraction_failed)
             self.worker.start()
+            self.start_button.hide()
+            self.stop_button.show()
+            
+    def stop_process(self):
+        # Restore the cursor to normal
+        QApplication.restoreOverrideCursor()
+        self.worker.terminate()
+        self.start_button.show()
+        self.stop_button.hide()
+        pass
 
     def update_status(self, message):
         self.status_output.append(message)
-
 
     def ex_exit(self, ex: BaseException, exit_code: int = 1) -> NoReturn:
         """
@@ -139,6 +152,8 @@ class MainWindow(QWidget):
     def extraction_done(self):
         # Restore the cursor to normal
         QApplication.restoreOverrideCursor()
+        self.start_button.show()
+        self.stop_button.hide()
 
         # Optional: Notify the user that the operation has finished
         self.update_status("Extraction done")
@@ -147,6 +162,8 @@ class MainWindow(QWidget):
     def extraction_failed(self, message: str):
         # Restore the cursor to normal
         QApplication.restoreOverrideCursor()
+        self.start_button.show()
+        self.stop_button.hide()
 
         # Optional: Notify the user that the operation has finished
         print(f"Extraction failed: {message}", file=sys.stderr)
