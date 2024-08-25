@@ -9,6 +9,14 @@ using OpenUnmix.
 
 If you are under Windows and don’t know how to use pip (see below), you can use the latest `yaas_installer.exe` in https://github.com/kleag/yaas/releases
 
+You must also install ffmpeg. It seems that the simplest way to do so under Windows is with winget (winget is installed by default on Windows 11, and can be installed using the Windows Store on previous versions).
+
+To install ffmpeg with winget, start PowerShell and the run:
+
+```
+winget install ffmpeg
+```
+
 
 ### Using pip
 
