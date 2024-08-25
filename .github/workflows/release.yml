@@ -12,7 +12,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v2
       # Step 2: Install Python
       - name: Set up Python
         uses: actions/setup-python@v4
