@@ -5,7 +5,8 @@ import sys
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QLabel, QLineEdit, QPushButton, QTextEdit,
                                QMessageBox, QSizePolicy)
-from PySide6.QtCore import (Qt, QStandardPaths, Slot)
+from PySide6.QtCore import (Qt, QDir, QStandardPaths, Slot)
+
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings
 from PySide6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
@@ -93,7 +94,8 @@ class MainWindow(QWidget):
         parser = argparse.ArgumentParser(description=description)
 
         parser.add_argument(
-            '-o', '--out', metavar="DIR", type=str, default='mp3',
+            '-o', '--out', metavar="DIR", type=str, 
+            default=os.path.join(QDir.homePath(), "yaas_tracks"),
             help="The directory in which to store the downloaded MP3 files.")
 
         return parser.parse_args()

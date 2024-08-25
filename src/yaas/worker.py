@@ -34,7 +34,11 @@ class Worker(QThread):
 
         self.url = url
         self.out = yaas.args.out
-        QDir().mkpath(self.out)
+        if not QDir().mkpath(self.out):
+            self.update_status.emit(f"Failed to creat result dir {self.out}")
+            raise RuntimeError(f"Failed to creat result dir {self.out}")
+        else:
+            self.update_status.emit(f'Created result dir {self.out}')
 
     def run(self):
         mp3_path = self.download_audio(self.url)
@@ -136,6 +140,7 @@ class Worker(QThread):
                 # Create the new path
                 wav_path = os.path.join(self.out, f"{file_name}_{source}.wav")
 
+                self.update_status.emit(f'Writing result to {wav_path}')
                 torchaudio.save(
                     wav_path,
                     torch.squeeze(estimate).to("cpu"),
