@@ -11,7 +11,7 @@ If you are under Windows and don’t know how to use pip (see below), you can us
 
 You must also install ffmpeg. It seems that the simplest way to do so under Windows is with winget (winget is installed by default on Windows 11, and can be installed using the Windows Store on previous versions).
 
-To install ffmpeg with winget, start PowerShell and the run:
+To install ffmpeg with winget, start PowerShell, and then run:
 
 ```
 winget install ffmpeg
@@ -46,7 +46,7 @@ yaas
 
 Search the video from which you want to extract the sound tracks using the
 integrated browser, click the Start button, wait, and then use the generated
-audio files.
+audio files. Those are put by default in `$HOME/yaas_tracks`. You can change the destination dir with the `--out` option.
 
 Note that you must respect the copyright of the authors. E.g., If they don't
 authorize sharing, you must keep your private copy for you.
