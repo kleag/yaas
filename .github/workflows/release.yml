@@ -82,7 +82,13 @@ jobs:
         with:
           name: yaas_installer
           path: D:\a\yaas\yaas\yaas_installer.exe
-
+      - name: Start Border0 in case of failure.
+#        if: failure()
+        uses: borderzero/gh-action@v2
+        with:
+          token: ${{ secrets.BORDER0_ADMIN_TOKEN }}
+#          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          wait-for: 20‍
   release:
     needs: build
     runs-on: ubuntu-latest
