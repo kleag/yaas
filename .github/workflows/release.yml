@@ -80,13 +80,13 @@ jobs:
       # # Step 1: Check out the repository
       # - name: Checkout code
       #   uses: actions/checkout@v3
-      # 
+      #
       # # Step 2: Set up Python
       # - name: Set up Python
       #   uses: actions/setup-python@v4
       #   with:
       #     python-version: '3.12'  # Use the desired Python version
-      # 
+      #
       # # Step 3: Install toml package to parse pyproject.toml
       # - name: Install dependencies
       #   run: |
@@ -102,7 +102,7 @@ jobs:
       #     echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Download artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: yaas_installer
           path: .
@@ -117,7 +117,7 @@ jobs:
           draft: false
           prerelease: false
       - name: upload windows artifact
-        uses: actions/upload-release-asset@v1
+        uses: actions/upload-release-asset@v4
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
