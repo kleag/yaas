@@ -1,5 +1,6 @@
 import argparse
 import os
+import subprocess
 import sys
 
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
@@ -10,7 +11,6 @@ from PySide6.QtCore import (Qt, QDir, QStandardPaths, Slot)
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings
 from PySide6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
-
 from typing import NoReturn
 
 from .worker import Worker
@@ -59,7 +59,7 @@ class MainWindow(QWidget):
         self.stop_button.clicked.connect(self.stop_process)
         self.layout.addWidget(self.stop_button)
         self.stop_button.hide()
-        
+
         self.status_output = QTextEdit()
         self.status_output.setReadOnly(True)
         self.status_output.setFixedHeight(70)  # Approximately 3 lines
@@ -99,7 +99,7 @@ class MainWindow(QWidget):
         parser = argparse.ArgumentParser(description=description)
 
         parser.add_argument(
-            '-o', '--out', metavar="DIR", type=str, 
+            '-o', '--out', metavar="DIR", type=str,
             default=os.path.join(QDir.homePath(), "yaas_tracks"),
             help="The directory in which to store the downloaded MP3 files.")
 
@@ -119,7 +119,7 @@ class MainWindow(QWidget):
             self.worker.start()
             self.start_button.hide()
             self.stop_button.show()
-            
+
     def stop_process(self):
         # Restore the cursor to normal
         QApplication.restoreOverrideCursor()
@@ -170,12 +170,37 @@ class MainWindow(QWidget):
         self.update_status(f"Extraction failed: {message}")
 
 
+    def check_ffmpeg(self):
+        # Try to call ffmpeg and capture the result
+        try:
+            result = subprocess.run(["ffmpeg", "-version"],
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE)
+            if result.returncode != 0:
+                self.show_popup("FFMPEG is not available. "
+                                "Please install it before starting Yaas.")
+        except FileNotFoundError:
+            self.show_popup("FFMPEG is not available. "
+                            "Please install it before starting Yaas.")
+        except Exception as e:
+            self.show_popup(f"Error occurred: {e}")
+
+    def show_popup(self, message):
+        # Create a popup message box
+        msg_box = QMessageBox()
+        msg_box.setIcon(QMessageBox.Critical)
+        msg_box.setText(message)
+        msg_box.setWindowTitle("FFMPEG Check")
+        msg_box.exec()
+        sys.exit(1)
+
 
 def main():
     os.environ["QTWEBENGINE_DISABLE_SANDBOX"] = "1"
     app = QApplication(sys.argv)
 
     main_window = MainWindow()
+    main_window.check_ffmpeg()
     main_window.show()
 
     sys.exit(app.exec())
