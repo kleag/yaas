@@ -3,6 +3,8 @@
 This is Yaas 0.6.4, a tool to split video soundtracks into separate tracks
 using OpenUnmix.
 
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/kleag)
+
 ## Installation
 
 ### Using the installer
