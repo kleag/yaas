@@ -49,13 +49,18 @@ class Worker(QThread):
 
         flac_path = mp3_path.replace('.mp3', '.flac')
         self.update_status.emit(f"Converting {mp3_path} to {flac_path}...")
-        self.convert_to_flac(mp3_path, flac_path)
-        self.update_status.emit(f"Converted to FLAC: {flac_path}")
-        os.remove(mp3_path)
-        self.update_status.emit("Extracting tracks...")
-        self.extract_tracks(flac_path)
-        self.update_status.emit("Extraction complete")
-        os.remove(flac_path)
+        try:
+            self.convert_to_flac(mp3_path, flac_path)
+            self.update_status.emit(f"Converted to FLAC: {flac_path}")
+            os.remove(mp3_path)
+            self.update_status.emit("Extracting tracks...")
+            self.extract_tracks(flac_path)
+            self.update_status.emit("Extraction complete")
+            os.remove(flac_path)
+        except Exception:
+            self.update_status.emit(f"Something went wrong during extraction "
+                                    f"of {self.url}")
+            return
 
     def download_audio(self, url):
         self.update_status.emit(f"Downloading audio from {url} ...")
@@ -97,6 +102,7 @@ class Worker(QThread):
                     'The given url is not a valid YouTube link')
         except BaseException as ex:
             self.extraction_failed.emit(f"Downloading audio failed with: {str(ex)}")
+            raise
 
         return filename
 
@@ -107,6 +113,7 @@ class Worker(QThread):
             audio.export(flac_path, format="flac")
         except BaseException as ex:
             self.extraction_failed.emit(f"Conversion to flac failed: {str(ex)}")
+            raise
 
     def extract_tracks(self, flac_path):
         self.update_status.emit(f"Extracting tracks from flac {flac_path}...")
@@ -150,5 +157,6 @@ class Worker(QThread):
             self.extraction_done.emit()
         except BaseException as ex:
             self.extraction_failed.emit(f"Tracks extraction failed with: {str(ex)}")
+            raise
 
 
