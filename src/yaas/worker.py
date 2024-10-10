@@ -120,10 +120,17 @@ class Worker(QThread):
         try:
             # Load the model
             model = openunmix.umxl()
-
+        except BaseException as ex:
+            self.extraction_failed.emit(f"Loading model failed with: {str(ex)}")
+            raise
+        try:
             # Load the audio file
             waveform, sample_rate = torchaudio.load(flac_path)
             waveform = waveform.mean(dim=0, keepdim=True)  # Convert to mono
+        except BaseException as ex:
+            self.extraction_failed.emit(f"Converting to mono failed with: {str(ex)}")
+            raise
+        try:
 
             # Perform source separation
             estimates = separate(
@@ -139,6 +146,10 @@ class Worker(QThread):
                 # device=None,
                 # filterbank="torch",
                 )
+        except BaseException as ex:
+            self.extraction_failed.emit(f"Source separation failed with: {str(ex)}")
+            raise
+        try:
 
             # Save each estimated source
             for source, estimate in estimates.items():
@@ -154,9 +165,9 @@ class Worker(QThread):
                     sample_rate= sample_rate,
                 )
                 self.update_status.emit(f'Wrote {source} to {wav_path}')
-            self.extraction_done.emit()
         except BaseException as ex:
-            self.extraction_failed.emit(f"Tracks extraction failed with: {str(ex)}")
+            self.extraction_failed.emit(f"Saving extracted tracks failed with: {str(ex)}")
             raise
+        self.extraction_done.emit()
 
 
