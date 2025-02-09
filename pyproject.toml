@@ -23,7 +23,7 @@ classifiers = [
     "Topic :: Multimedia :: Video",
     "Topic :: Multimedia :: Video :: Conversion"
 ]
-requires-python = ">=3.8,<3.12"
+requires-python = ">=3.8,<3.14"
 dependencies = [
     "PySide6 >= 6.7.1",
     "ffmpeg >= 1.4",
@@ -32,7 +32,7 @@ dependencies = [
     "torch == 2.3.1",
     "torchaudio >= 2.1.0",
     "openunmix >= 1.3.0",
-    "pytubefix >= 7.4.0",
+    "pytubefix >= 8.12.1",
     "moviepy >= 1.0.3",
     "PySoundFile >= 0.9.0.post1",
 ]
