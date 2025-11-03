@@ -23,7 +23,7 @@ classifiers = [
     "Topic :: Multimedia :: Video",
     "Topic :: Multimedia :: Video :: Conversion"
 ]
-requires-python = ">=3.8,<3.14"
+requires-python = ">=3.8,<3.13"
 dependencies = [
     "PySide6 >= 6.7.1",
     "ffmpeg >= 1.4",
@@ -35,6 +35,8 @@ dependencies = [
     "pytubefix >= 8.12.1",
     "moviepy >= 1.0.3",
     "PySoundFile >= 0.9.0.post1",
+    "moviepy == 1.0.3",
+    "audioop-lts >= 2.3.1"
 ]
 keywords = ["audio", "video", "track", "split", "gui", "qt"]
 
