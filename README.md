@@ -3,13 +3,13 @@
 This is Yaas 0.7.1, a tool to split video soundtracks into separate tracks
 using OpenUnmix.
 
-[["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/kleag)
+[![Buy Me A Coffee](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/kleag)
 
 ## Installation
 
 ### Using the installer
 
-If you are under Windows and don’t know how to use uv and pip (see below), you can use the latest `yaas_installer.exe` in https://github.com/kleag/yaas/releases
+If you are under Windows and don't know how to use uv and pip (see below), you can use the latest `yaas_installer.exe` in https://github.com/kleag/yaas/releases
 
 You must also install ffmpeg. It seems that the simplest way to do so under Windows is with winget (winget is installed by default on Windows 11, and can be installed using the Windows Store on previous versions).
 
@@ -18,7 +18,6 @@ To install ffmpeg with winget, start PowerShell, and then run:
 ```
 winget install ffmpeg
 ```
-
 
 ### Using uv
 
@@ -61,6 +60,23 @@ replaces the `Start` button during work.
 Note that you must respect the copyright of the authors. E.g., If they don't
 authorize sharing, you must keep your private copy for you.
 
+### Model Options
+
+Yaas supports multiple track separation models:
+
+1. **OpenUnmix** (default): Uses the OpenUnmix model for track separation
+2. **Audio Separator**: Uses the audio-separator library with BS-Roformer-SW model
+
+To use the audio-separator model, install it first:
+```bash
+pip install "audio_separator[cpu]"
+```
+
+Then run Yaas with:
+```bash
+yaas --model audio_separator
+```
+
 ## Building and distributing
 
 ```bash
@@ -69,7 +85,6 @@ bumpver update --patch
 uv build
 uv publish
 ```
-
 
 ### Under Windows
 

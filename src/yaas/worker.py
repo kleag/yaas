@@ -1,6 +1,7 @@
 import argparse
 import sys
 import os
+import logging
 from PySide6.QtCore import (QThread, Signal, QStandardPaths, QDir)
 from pytubefix import YouTube, Playlist
 from pydub import AudioSegment
@@ -12,6 +13,11 @@ from openunmix.predict import separate
 from yturl2mp3.config import Config
 from yturl2mp3.helpers import (convert_mp4_to_mp3, download_mp3,
                                is_valid_playlist_url, is_valid_video_url)
+try:
+    from audio_separator.separator import Separator
+    HAS_AUDIO_SEPARATOR = True
+except ImportError:
+    HAS_AUDIO_SEPARATOR = False
 
 
 class Worker(QThread):
@@ -34,6 +40,7 @@ class Worker(QThread):
 
         self.url = url
         self.out = yaas.args.out
+        self.model_type = getattr(yaas.args, 'model', 'openunmix')  # Default to openunmix
         if not QDir().mkpath(self.out):
             self.update_status.emit(f"Failed to creat result dir {self.out}")
             raise RuntimeError(f"Failed to creat result dir {self.out}")
@@ -78,7 +85,7 @@ class Worker(QThread):
 
                 self.update_status.emit(f'Converting video {path} to MP3 File...')
 
-                filename = convert_mp4_to_mp3(path)
+                filename = convert_mp4_to_mp3(path, delete_after=True)
 
                 self.update_status.emit(f'Conversion complete... Result: {filename}')
             elif is_valid_playlist_url(url):
@@ -92,7 +99,7 @@ class Worker(QThread):
                     self.update_status.emit(
                         f'Converting video {i} to MP3 File...')
 
-                    filename = convert_mp4_to_mp3(path)
+                    filename = convert_mp4_to_mp3(path, delete_after=True)
 
                     self.update_status.emit(
                         'Conversion complete. Moving on to next...')
@@ -116,7 +123,19 @@ class Worker(QThread):
             raise
 
     def extract_tracks(self, flac_path):
-        self.update_status.emit(f"Extracting tracks from flac {flac_path}...")
+        self.update_status.emit(f"Extracting tracks from flac {flac_path} with model {self.model_type}...")
+        if self.model_type == "audio_separator":
+            if not HAS_AUDIO_SEPARATOR:
+                self.extraction_failed.emit("audio_separator library not installed. Please install it with 'pip install \"audio_separator[cpu]\"'")
+                return
+            self._extract_with_audio_separator(flac_path)
+        else:
+            # Default to openunmix
+            self._extract_with_openunmix(flac_path)
+        self.extraction_done.emit()
+
+    def _extract_with_openunmix(self, flac_path):
+        self.update_status.emit(f"Extracting tracks from flac {flac_path} with OpenUnmix...")
         try:
             # Load the model
             model = openunmix.umxl()
@@ -171,6 +190,29 @@ class Worker(QThread):
         except BaseException as ex:
             self.extraction_failed.emit(f"Saving extracted tracks failed with: {str(ex)}")
             raise
-        self.extraction_done.emit()
+
+    def _extract_with_audio_separator(self, flac_path):
+        self.update_status.emit(f"Extracting tracks from flac {flac_path} with audio_separator...")
+        try:
+            # Initialize audio separator
+            separator = Separator(
+                log_level=logging.INFO,
+                output_dir=self.out,
+                output_format="WAV",
+            )
+            
+            # Load a specific RoFormer model trained for multi-stem
+            separator.load_model(model_filename="BS-Roformer-SW.ckpt")
+            # separator.load_model(model_filename="htdemucs_6s.yaml")
 
 
+            
+            # Separate audio
+            output_files = separator.separate(flac_path)
+            
+            # Process output files - audio_separator generates files in output directory
+            self.update_status.emit(f"Separation complete. Generated files: {output_files}")
+            
+        except Exception as ex:
+            self.extraction_failed.emit(f"Audio separator failed with: {str(ex)}")
+            raise

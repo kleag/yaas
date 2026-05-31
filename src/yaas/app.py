@@ -102,6 +102,11 @@ class MainWindow(QWidget):
             '-o', '--out', metavar="DIR", type=str,
             default=os.path.join(QDir.homePath(), "yaas_tracks"),
             help="The directory in which to store the downloaded MP3 files.")
+        
+        parser.add_argument(
+            '--model', metavar="MODEL", type=str,
+            default="openunmix",
+            help="The model to use for track separation (openunmix, audio_separator)")
 
         return parser.parse_known_args()[0]
 
