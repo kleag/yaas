@@ -9,7 +9,7 @@ using OpenUnmix.
 
 ### Using the installer
 
-If you are under Windows and don’t know how to use pip (see below), you can use the latest `yaas_installer.exe` in https://github.com/kleag/yaas/releases
+If you are under Windows and don’t know how to use uv and pip (see below), you can use the latest `yaas_installer.exe` in https://github.com/kleag/yaas/releases
 
 You must also install ffmpeg. It seems that the simplest way to do so under Windows is with winget (winget is installed by default on Windows 11, and can be installed using the Windows Store on previous versions).
 
@@ -20,10 +20,14 @@ winget install ffmpeg
 ```
 
 
-### Using pip
+### Using uv
+
+Create and activate a virtual environment. For information on uv, see https://docs.astral.sh/uv/getting-started/.
+
+Then install yaas in your environment:
 
 ```bash
-pip install yaas
+uv pip install yaas
 ```
 
 If you are under Windows, you will have to ensure to have a working python installation and to have ffmpeg installed.
@@ -36,9 +40,9 @@ If you are under Windows, you will have to ensure to have a working python insta
 
 Search yaas in your installed applications and start it.
 
-#### When installed with pip
+#### When installed with uv
 
-Just run
+Activate your virtual environment and then just run:
 
 ```
 yaas
@@ -62,8 +66,8 @@ authorize sharing, you must keep your private copy for you.
 ```bash
 git commit
 bumpver update --patch
-python -m build
-twine upload dist/*
+uv build
+uv publish
 ```
 
 
@@ -77,7 +81,7 @@ pyinstaller .\yaas.spec
 ## Author
 
 Gaël de Chalendar, aka Kleag
-(c) Gaël de Chalendar, 2024
+(c) Gaël de Chalendar, 2024-2026
 
 This program is free software, licensed under the Mozilla Public License 2.0
 (MPL 2.0) license (see the LICENSE file). It includes most of the
