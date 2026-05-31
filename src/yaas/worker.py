@@ -40,7 +40,7 @@ class Worker(QThread):
 
         self.url = url
         self.out = yaas.args.out
-        self.model_type = getattr(yaas.args, 'model', 'openunmix')  # Default to openunmix
+        self.backend_type = getattr(yaas.args, 'backend', 'openunmix')  # Default to openunmix
         if not QDir().mkpath(self.out):
             self.update_status.emit(f"Failed to creat result dir {self.out}")
             raise RuntimeError(f"Failed to creat result dir {self.out}")
@@ -123,8 +123,8 @@ class Worker(QThread):
             raise
 
     def extract_tracks(self, flac_path):
-        self.update_status.emit(f"Extracting tracks from flac {flac_path} with model {self.model_type}...")
-        if self.model_type == "audio_separator":
+        self.update_status.emit(f"Extracting tracks from flac {flac_path} with backend {self.backend_type}...")
+        if self.backend_type == "audio_separator":
             if not HAS_AUDIO_SEPARATOR:
                 self.extraction_failed.emit("audio_separator library not installed. Please install it with 'pip install \"audio_separator[cpu]\"'")
                 return

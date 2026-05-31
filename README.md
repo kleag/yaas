@@ -60,21 +60,21 @@ replaces the `Start` button during work.
 Note that you must respect the copyright of the authors. E.g., If they don't
 authorize sharing, you must keep your private copy for you.
 
-### Model Options
+### Backend Options
 
-Yaas supports multiple track separation models:
+Yaas supports multiple track separation backends:
 
 1. **OpenUnmix** (default): Uses the OpenUnmix model for track separation
-2. **Audio Separator**: Uses the audio-separator library with BS-Roformer-SW model
+2. **Audio Separator**: Uses the audio-separator library with ht-demucs model
 
-To use the audio-separator model, install it first:
+To use the audio-separator backend, install it first:
 ```bash
 pip install "audio_separator[cpu]"
 ```
 
 Then run Yaas with:
 ```bash
-yaas --model audio_separator
+yaas --backend audio_separator
 ```
 
 ## Building and distributing

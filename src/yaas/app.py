@@ -104,9 +104,9 @@ class MainWindow(QWidget):
             help="The directory in which to store the downloaded MP3 files.")
         
         parser.add_argument(
-            '--model', metavar="MODEL", type=str,
-            default="openunmix",
-            help="The model to use for track separation (openunmix, audio_separator)")
+            '--backend', metavar="BACKEND", type=str,
+            default="audio_separator",
+            help="The backend to use for track separation (openunmix, audio_separator)")
 
         return parser.parse_known_args()[0]
 
