@@ -4,7 +4,7 @@
 from .config import Config
 import re
 import os
-from moviepy import editor
+from moviepy.video.io.VideoFileClip import VideoFileClip
 from pytubefix import YouTube
 
 from pathlib import Path
@@ -40,10 +40,10 @@ def convert_mp4_to_mp3(path: str, delete_after: bool = True) -> str:
     :return: The path of the newly created mp3 file
     """
     mp3_path = f'{path[:-3]}mp3'  # changes "mp4" to "mp3"
-    mp4 = editor.VideoFileClip(path)
+    mp4 = VideoFileClip(path)
 
     mp3 = mp4.audio
-    mp3.write_audiofile(mp3_path, verbose=True, logger=None)
+    mp3.write_audiofile(mp3_path, logger="bar")
 
     mp3.close()
     mp4.close()
@@ -63,8 +63,12 @@ def is_valid_video_url(url: str) -> bool:
     :param url: The url pointing to the YouTube video
     :return: True if the url is valid, otherwise false
     """
-    return None is not re.match('https:\/\/www\.youtube\.[a-z]{2,}\/watch\?v=([A-Za-z0-9-_\&]+)', url)
+    # return None is not re.match('https:\/\/www\.youtube\.[a-z]{2,}\/watch\?v=([A-Za-z0-9-_\&]+)', url)
+    # 1. We anchor the end ($) so extra parameters don't break the logic
+    # 2. We limit the video ID to exactly 11 characters {11}
+    pattern = r'^https://www\.youtube\.[a-z]{2,}/watch\?v=([A-Za-z0-9_-]{11})'
 
+    return bool(re.match(pattern, url))
 
 def is_valid_playlist_url(url: str) -> bool:
     """
@@ -76,4 +80,7 @@ def is_valid_playlist_url(url: str) -> bool:
     :param url: The url to validate
     :return: True if the url is valid, otherwise false.
     """
-    return None is not re.match('https:\/\/www\.youtube\.[a-z]{2,}\/playlist\?list=([A-Za-z0-9-_\&]+)', url)
+    # return None is not re.match('https:\/\/www\.youtube\.[a-z]{2,}\/playlist\?list=([A-Za-z0-9-_\&]+)', url)
+    pattern = r'^https://www\.youtube\.[a-z]{2,}/playlist\?list=([A-Za-z0-9-_\&]+)'
+
+    return bool(re.match(pattern, url))
