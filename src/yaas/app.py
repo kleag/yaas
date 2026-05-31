@@ -106,7 +106,14 @@ class MainWindow(QWidget):
         parser.add_argument(
             '--backend', metavar="BACKEND", type=str,
             default="audio_separator",
+            choices=["audio_separator", "openunmix"],
             help="The backend to use for track separation (openunmix, audio_separator)")
+        
+        parser.add_argument(
+            '--model', metavar="MODEL", type=str,
+            default="roformer",
+            choices=["roformer", "htdemucs6s"],
+            help="The model to use with audio_separator backend (roformer, htdemucs6s)")
 
         return parser.parse_known_args()[0]
 

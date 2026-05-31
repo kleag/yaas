@@ -41,6 +41,7 @@ class Worker(QThread):
         self.url = url
         self.out = yaas.args.out
         self.backend_type = getattr(yaas.args, 'backend', 'openunmix')  # Default to openunmix
+        self.model_type = getattr(yaas.args, 'model', 'roformer')  # Default to BS-Roformer-SW.ckpt
         if not QDir().mkpath(self.out):
             self.update_status.emit(f"Failed to creat result dir {self.out}")
             raise RuntimeError(f"Failed to creat result dir {self.out}")
@@ -192,7 +193,7 @@ class Worker(QThread):
             raise
 
     def _extract_with_audio_separator(self, flac_path):
-        self.update_status.emit(f"Extracting tracks from flac {flac_path} with audio_separator...")
+        self.update_status.emit(f"Extracting tracks from flac {flac_path} with {self.model_type}...")
         try:
             # Initialize audio separator
             separator = Separator(
@@ -201,12 +202,16 @@ class Worker(QThread):
                 output_format="WAV",
             )
             
-            # Load a specific RoFormer model trained for multi-stem
-            separator.load_model(model_filename="BS-Roformer-SW.ckpt")
-            # separator.load_model(model_filename="htdemucs_6s.yaml")
-
-
+            # Map simple option names to actual model filenames
+            model_map = {
+                "roformer": "BS-Roformer-SW.ckpt",
+                "htdemucs6s": "htdemucs_6s.yaml"
+            }
             
+            # Load the specified model
+            model_filename = model_map.get(self.model_type, "BS-Roformer-SW.ckpt")  # Default to roformer
+            separator.load_model(model_filename=model_filename)
+
             # Separate audio
             output_files = separator.separate(flac_path)
             
