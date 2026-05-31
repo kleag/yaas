@@ -127,6 +127,9 @@ class Worker(QThread):
             # Load the audio file
             waveform, sample_rate = torchaudio.load(flac_path)
             waveform = waveform.mean(dim=0, keepdim=True)  # Convert to mono
+            print(f"Loaded audio at: {sample_rate}MHz", file=sys.stderr)
+            self.update_status.emit(f"Loaded audio at: {sample_rate}MHz")
+
         except BaseException as ex:
             self.extraction_failed.emit(f"Converting to mono failed with: {str(ex)}")
             raise

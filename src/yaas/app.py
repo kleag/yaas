@@ -103,7 +103,7 @@ class MainWindow(QWidget):
             default=os.path.join(QDir.homePath(), "yaas_tracks"),
             help="The directory in which to store the downloaded MP3 files.")
 
-        return parser.parse_args()
+        return parser.parse_known_args()[0]
 
     def start_process(self):
         # url = self.url_input.text()
@@ -196,7 +196,19 @@ class MainWindow(QWidget):
 
 
 def main():
-    os.environ["QTWEBENGINE_DISABLE_SANDBOX"] = "1"
+    # 1. Platform-Specific Fixes
+    if sys.platform.startswith("linux"):
+        # Only force X11/xcb on Linux to bypassWayland Chromium bugs
+        os.environ["QT_QPA_PLATFORM"] = "xcb"
+        # Optional: ONLY use this if Linux users experience crashes without it.
+        # Try to keep it commented out for maximum user security.
+        # os.environ["QTWEBENGINE_DISABLE_SANDBOX"] = "1"
+    # 2. Safe Cross-Platform Flags (Windows, Mac, and Linux)
+    # Fixes the YouTube rendering flicker cleanly across all OS environments
+    # sys.argv.append("--disable-gpu-compositing")
+
+    # Forces proper graphics communication in Qt6
+    QApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True)
     app = QApplication(sys.argv)
 
     main_window = MainWindow()
