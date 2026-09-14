@@ -1,13 +1,17 @@
 # runtime requirements
-PySide6 
-openunmix
-torch==2.3.1
-pytubefix==8.12.1
-moviepy==1.0.3
-numpy==1.26.4
-pydub
-ffmpeg
-PySoundFile
+PySide6>=6.11.2
+ffmpeg>=1.4
+numpy>=2.5.3
+pydub>=0.25.1
+torch>=2.14.0
+torchaudio>=2.11.0
+torchcodec>=0.16.0
+openunmix>=1.3.0
+pytubefix>=11.1.0
+moviepy>=2.2.1
+PySoundFile>=0.9.0
+audioop-lts>=0.2.2
+audio_separator[cpu]>=0.47.0
 
 # setup requirements
 setuptools>=54.0.0
