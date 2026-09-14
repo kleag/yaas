@@ -5,7 +5,7 @@ import sys
 
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QLabel, QLineEdit, QPushButton, QTextEdit,
-                               QMessageBox, QSizePolicy)
+                               QMessageBox, QSizePolicy, QProgressBar)
 from PySide6.QtCore import (Qt, QDir, QStandardPaths, Slot)
 
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -59,6 +59,12 @@ class MainWindow(QWidget):
         self.stop_button.clicked.connect(self.stop_process)
         self.layout.addWidget(self.stop_button)
         self.stop_button.hide()
+
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.layout.addWidget(self.progress_bar)
+        self.progress_bar.hide()
 
         self.status_output = QTextEdit()
         self.status_output.setReadOnly(True)
@@ -128,6 +134,10 @@ class MainWindow(QWidget):
             QApplication.setOverrideCursor(Qt.WaitCursor)
             self.worker.extraction_done.connect(self.extraction_done)
             self.worker.extraction_failed.connect(self.extraction_failed)
+            self.worker.progress.connect(self.update_progress)
+            self.progress_bar.setRange(0, 0)  # indeterminate until real progress arrives
+            self.progress_bar.setValue(0)
+            self.progress_bar.show()
             self.worker.start()
             self.start_button.hide()
             self.stop_button.show()
@@ -138,7 +148,7 @@ class MainWindow(QWidget):
         self.worker.terminate()
         self.start_button.show()
         self.stop_button.hide()
-        pass
+        self.progress_bar.hide()
 
     def update_status(self, message):
         self.status_output.append(message)
@@ -166,6 +176,7 @@ class MainWindow(QWidget):
         QApplication.restoreOverrideCursor()
         self.start_button.show()
         self.stop_button.hide()
+        self.progress_bar.hide()
 
         # Optional: Notify the user that the operation has finished
         self.update_status("Extraction done")
@@ -176,10 +187,18 @@ class MainWindow(QWidget):
         QApplication.restoreOverrideCursor()
         self.start_button.show()
         self.stop_button.hide()
+        self.progress_bar.hide()
 
         # Optional: Notify the user that the operation has finished
         print(f"Extraction failed: {message}", file=sys.stderr)
         self.update_status(f"Extraction failed: {message}")
+
+    @Slot(int)
+    def update_progress(self, value):
+        if self.progress_bar.maximum() == 0:
+            # Switch out of indeterminate/busy mode once real progress arrives.
+            self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(value)
 
 
     def check_ffmpeg(self):

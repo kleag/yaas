@@ -1,4 +1,6 @@
 import argparse
+import contextlib
+import importlib
 import sys
 import os
 import logging
@@ -25,6 +27,7 @@ class Worker(QThread):
     ex_exit = Signal(BaseException, int)
     extraction_done = Signal()
     extraction_failed = Signal(str)
+    progress = Signal(int)
 
     def __init__(self, url, yaas):
         super().__init__()
@@ -201,23 +204,83 @@ class Worker(QThread):
                 output_dir=self.out,
                 output_format="WAV",
             )
-            
+
             # Map simple option names to actual model filenames
             model_map = {
                 "roformer": "BS-Roformer-SW.ckpt",
                 "htdemucs6s": "htdemucs_6s.yaml"
             }
-            
+
             # Load the specified model
             model_filename = model_map.get(self.model_type, "BS-Roformer-SW.ckpt")  # Default to roformer
             separator.load_model(model_filename=model_filename)
 
-            # Separate audio
-            output_files = separator.separate(flac_path)
-            
+            # Separate audio, reporting progress through the `progress` signal
+            # instead of the ASCII tqdm bar audio_separator draws on the terminal.
+            with self._redirect_separator_progress_to_qt():
+                output_files = separator.separate(flac_path)
+
             # Process output files - audio_separator generates files in output directory
             self.update_status.emit(f"Separation complete. Generated files: {output_files}")
-            
+
         except Exception as ex:
             self.extraction_failed.emit(f"Audio separator failed with: {str(ex)}")
             raise
+
+    @contextlib.contextmanager
+    def _redirect_separator_progress_to_qt(self):
+        """Intercept the tqdm progress bars used internally by audio_separator's
+        MDX/MDXC/VR/Demucs backends (including the roformer model) and report
+        them through the `progress` Qt signal instead of drawing an ASCII bar
+        on the terminal.
+        """
+        from tqdm import tqdm as base_tqdm
+
+        emit = self.progress.emit
+        devnull = open(os.devnull, "w")
+
+        class _QtProgressTqdm(base_tqdm):
+            def __init__(self, *args, **kwargs):
+                kwargs["file"] = devnull
+                super().__init__(*args, **kwargs)
+
+            def display(self, msg=None, pos=None):
+                if self.total:
+                    emit(int(self.n * 100 / self.total))
+
+        class _FakeTqdmModule:
+            tqdm = _QtProgressTqdm
+
+        # `mdx_separator`/`mdxc_separator`/`vr_separator` do `from tqdm import tqdm`,
+        # so the module-level name is the class itself. The demucs modules do
+        # `import tqdm` and call `tqdm.tqdm(...)`, so they need a fake module.
+        # Each architecture is imported independently and best-effort: some of
+        # them pull in heavy optional dependencies (e.g. mdx_separator needs
+        # onnx2torch/torchvision) that may not be usable in every environment,
+        # and that must not prevent patching (or using) the others.
+        module_specs = [
+            ("audio_separator.separator.architectures.mdx_separator", "tqdm", lambda m: _QtProgressTqdm),
+            ("audio_separator.separator.architectures.mdxc_separator", "tqdm", lambda m: _QtProgressTqdm),
+            ("audio_separator.separator.architectures.vr_separator", "tqdm", lambda m: _QtProgressTqdm),
+            ("audio_separator.separator.uvr_lib_v5.demucs.apply", "tqdm", lambda m: _FakeTqdmModule),
+            ("audio_separator.separator.uvr_lib_v5.demucs.utils", "tqdm", lambda m: _FakeTqdmModule),
+        ]
+        patches = []
+        for module_name, attr, replacement_for in module_specs:
+            try:
+                mod = importlib.import_module(module_name)
+            except Exception as ex:
+                self.update_status.emit(
+                    f"Progress bar: skipping {module_name} ({ex.__class__.__name__}: {ex})")
+                continue
+            patches.append((mod, attr, replacement_for(mod)))
+        originals = [(mod, attr, getattr(mod, attr)) for mod, attr, _ in patches]
+        for mod, attr, replacement in patches:
+            setattr(mod, attr, replacement)
+        try:
+            yield
+        finally:
+            for mod, attr, original in originals:
+                setattr(mod, attr, original)
+            devnull.close()
+            self.progress.emit(0)

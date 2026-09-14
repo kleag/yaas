@@ -8,7 +8,6 @@ torchaudio>=2.11.0
 torchcodec>=0.16.0
 openunmix>=1.3.0
 pytubefix>=11.1.0
-moviepy>=2.2.1
 PySoundFile>=0.9.0
 audioop-lts>=0.2.2
 audio_separator[cpu]>=0.47.0

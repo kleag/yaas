@@ -4,49 +4,51 @@
 from .config import Config
 import re
 import os
-from moviepy.video.io.VideoFileClip import VideoFileClip
+from pydub import AudioSegment
 from pytubefix import YouTube
-
-from pathlib import Path
 
 YOUTUBE_URL = 'https://www.youtube.com'
 
 
 def download_mp3(video: YouTube, config: Config) -> str:
     """
-    Downloads the audio of a YouTube video in MP3 format.
+    Downloads the audio of a YouTube video.
 
     :param video: The video from which to download the audio
     :param config: The configuration settings for the download
-    :return: The path of the newly created mp4 file
+    :return: The path of the newly downloaded audio/video file
     """
-    # returns the mp4 only containing audio
-    stream = video.streams.get_lowest_resolution()
+    # Prefer an audio-only stream: it's smaller and, unlike a progressive
+    # (video+audio) stream, YouTube still reliably offers one even though
+    # progressive streams have been phased out for most videos/clients.
+    stream = video.streams.get_audio_only()
+    if stream is None:
+        stream = video.streams.get_lowest_resolution()
+    if stream is None:
+        raise RuntimeError(
+            f"No downloadable audio or video stream found for {video.watch_url}")
+
     path_to_saved = stream.download(
         output_path=config.out_dir, timeout=config.timeout,
         max_retries=config.max_retries,
         skip_existing=True)
-    path_to_saved = os.path.realpath(path_to_saved)
-    mp4_path = Path(config.out_dir) / stream.default_filename
-    return path_to_saved
+    return os.path.realpath(path_to_saved)
 
 
 def convert_mp4_to_mp3(path: str, delete_after: bool = True) -> str:
-    """pyt
-    Converts an mp4 file to an mp3 file
+    """
+    Converts a downloaded audio/video file to an mp3 file.
 
-    :param path: The path of the mp4 file
-    :param delete_after: If false, the mp4 file will not be deleted after conversion
+    :param path: The path of the downloaded file (e.g. mp4 or m4a)
+    :param delete_after: If false, the source file will not be deleted after conversion
     :return: The path of the newly created mp3 file
     """
-    mp3_path = f'{path[:-3]}mp3'  # changes "mp4" to "mp3"
-    mp4 = VideoFileClip(path)
-
-    mp3 = mp4.audio
-    mp3.write_audiofile(mp3_path, logger="bar")
-
-    mp3.close()
-    mp4.close()
+    mp3_path = f'{os.path.splitext(path)[0]}.mp3'
+    # pydub (via ffmpeg) decodes the audio track regardless of whether the
+    # container also holds a video track, unlike moviepy's VideoFileClip
+    # which requires one.
+    audio = AudioSegment.from_file(path)
+    audio.export(mp3_path, format="mp3")
 
     if delete_after:
         os.remove(path)
