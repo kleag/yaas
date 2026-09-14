@@ -78,7 +78,7 @@ class Worker(QThread):
                 self.update_status.emit(
                     'Single YouTube video Detected. Initializing...')
 
-                video = YouTube(url)
+                video = YouTube(url, "WEB")
                 config = Config(out_dir=self.app_data_path, timeout=5000,
                                 max_retries=3)
                 self.update_status.emit(f"Downloading audio to {self.app_data_path} ...")
