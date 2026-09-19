@@ -372,6 +372,17 @@ def main():
         # Optional: ONLY use this if Linux users experience crashes without it.
         # Try to keep it commented out for maximum user security.
         # os.environ["QTWEBENGINE_DISABLE_SANDBOX"] = "1"
+        # The frozen/AppImage build bundles its own libibusplatforminputcontextplugin.so.
+        # On a desktop that runs ibus-daemon (the Ubuntu/GNOME default, even for
+        # plain Latin keyboard layouts), Qt lazily loads and connects that plugin
+        # to the *system* ibus-daemon the first time a text field requests an
+        # input context -- i.e. on the first keystroke typed anywhere, including
+        # into the embedded YouTube page. The bundled plugin talking to whatever
+        # ibus happens to be installed on the user's system is a well-known
+        # source of crashes for frozen/bundled Qt apps. Disabling platform IME
+        # integration entirely avoids loading that plugin at all; basic (Latin)
+        # text entry still works fine without it.
+        os.environ["QT_IM_MODULE"] = ""
     # 2. Safe Cross-Platform Flags (Windows, Mac, and Linux)
     # Fixes the YouTube rendering flicker cleanly across all OS environments
     # sys.argv.append("--disable-gpu-compositing")
