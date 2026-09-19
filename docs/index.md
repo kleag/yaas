@@ -13,7 +13,7 @@ It works by:
 4. writing the resulting WAV stems to an output directory (`$HOME/yaas_tracks`
    by default).
 
-[:material-buy-me-a-coffee: Buy Gaël a coffee](https://www.buymeacoffee.com/kleag){ .md-button }
+[![Buy Me A Coffee](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/kleag)
 
 ## Where to go next
 
