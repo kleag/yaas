@@ -1,5 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import sys
+
 from PyInstaller.utils.hooks import collect_submodules
 from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT, BUNDLE
 
@@ -10,7 +12,7 @@ a = Analysis(
     pathex=['.'],
     binaries=[],
     datas=[],
-    hiddenimports=['PySide6', 'pytubefix', 'pydub', 'torch', 'torchaudio', 'torchcodec', 'openunmix', 'audio_separator', 'audioop', 'ffmpeg', 'PySoundFile'],
+    hiddenimports=['PySide6', 'pytubefix', 'pydub', 'torch', 'torchaudio', 'torchcodec', 'openunmix', 'audio_separator', 'audioop', 'ffmpeg', 'soundfile'],
     hookspath=[],
     runtime_hooks=[],
     excludes=[],
@@ -45,22 +47,16 @@ exe = EXE(
 #     entitlements_file=None,
 
 
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='yaas',
-)
-
-# app = BUNDLE(
-#     coll,
-#     name='yaas',
-#     format='onefile'
-# )
-#     icon=None,
-#     bundle_identifier=None,
-#     version=None,
+if sys.platform == 'darwin':
+    # BUNDLE wraps the onefile `exe` target above into a double-clickable
+    # yaas.app. COLLECT (the onedir variant) is intentionally not used: with
+    # exclude_binaries=False, `exe` above is already a self-contained
+    # onefile binary, and running COLLECT against it as well would try to
+    # write a `dist/yaas` directory over the `dist/yaas` onefile binary
+    # (only harmless on Windows because of the `.exe` extension).
+    app = BUNDLE(
+        exe,
+        name='yaas.app',
+        icon=None,
+        bundle_identifier='com.kleag.yaas',
+    )

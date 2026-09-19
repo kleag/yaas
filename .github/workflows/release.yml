@@ -6,25 +6,12 @@ on:
       - '*.*.*'
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Add msbuild to PATH
-        uses: microsoft/setup-msbuild@v2
-
-      # - name: Install toml to later extract version number
-      #   run: |
-      #       python -m pip install --upgrade pip
-      #       pip install toml
-      # - name: Get version from pyproject.toml
-      #   id: get_version
-      #   run: |
-      #       $version = python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])"
-      #       echo "Version is $version"
-      #       echo "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        uses: actions/checkout@v4
 
       - name: Setup FFMPEG
         uses: FedericoCarboni/setup-ffmpeg@v3
@@ -33,20 +20,13 @@ jobs:
           ffmpeg-version: release
           github-token: ${{ github.server_url == 'https://github.com' && github.token || '' }}
 
-      # - name: Set up Python
-      #   uses: actions/setup-python@v2
-      #   with:
-      #     python-version: '3.x'
-
       - name: Set up Inno Setup
         run: |
-            # Download Inno Setup
             Invoke-WebRequest -Uri https://jrsoftware.org/download.php/is.exe -OutFile is.exe
-            # Install Inno Setup
             Start-Process is.exe -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-'  -NoNewWindow -Wait
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install .
 
       - name: Install pyinstaller
         run: pip install pyinstaller
@@ -56,72 +36,129 @@ jobs:
 
       - name: Build Installer
         run: |
-            # Run the Inno Setup script
             &"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" inno_setup_script.iss
 
       - name: Upload installer as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: yaas_installer
-          path: D:\a\yaas\yaas\yaas_installer.exe
-#       - name: Start Border0 in case of failure.
-# #        if: failure()
-#         uses: borderzero/gh-action@v2
-#         with:
-#           token: ${{ secrets.BORDER0_ADMIN_TOKEN }}
-# #          slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
-#           wait-for: 20‍
+          name: yaas_installer_windows
+          path: yaas_installer.exe
+
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install .
+
+      - name: Install pyinstaller
+        run: pip install pyinstaller
+
+      - name: Build app bundle with pyinstaller
+        run: pyinstaller yaas.spec
+
+      - name: Build DMG
+        run: |
+          hdiutil create -volname Yaas -srcfolder dist/yaas.app -ov -format UDZO yaas_installer.dmg
+
+      - name: Upload installer as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: yaas_installer_macos
+          path: yaas_installer.dmg
+
+  build-linux-appimage:
+    runs-on: ubuntu-latest
+    # AppImage packaging for a PySide6/WebEngine app is the least battle
+    # tested of the three targets; don't let it block the Windows/macOS
+    # installers or the PyPI publish if it breaks.
+    continue-on-error: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install .
+
+      - name: Install pyinstaller
+        run: pip install pyinstaller
+
+      - name: Build executable with pyinstaller
+        run: pyinstaller yaas.spec
+
+      - name: Assemble AppDir
+        run: |
+          set -e
+          mkdir -p AppDir/usr/bin
+          cp dist/yaas AppDir/usr/bin/yaas
+          chmod +x AppDir/usr/bin/yaas
+
+          cat > AppDir/yaas.desktop <<'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=Yaas
+          Exec=yaas
+          Icon=yaas
+          Categories=AudioVideo;Audio;
+          EOF
+
+          cat > AppDir/AppRun <<'EOF'
+          #!/bin/sh
+          HERE="$(dirname "$(readlink -f "${0}")")"
+          exec "${HERE}/usr/bin/yaas" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+
+          pip install pillow
+          python3 -c "
+          from PIL import Image, ImageDraw
+          img = Image.new('RGBA', (256, 256), (30, 30, 30, 255))
+          d = ImageDraw.Draw(img)
+          d.ellipse((28, 28, 228, 228), fill=(90, 150, 230, 255))
+          d.text((100, 118), 'Y', fill=(255, 255, 255, 255))
+          img.save('AppDir/yaas.png')
+          "
+
+      - name: Build AppImage
+        run: |
+          set -e
+          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
+          chmod +x appimagetool
+          ./appimagetool --appimage-extract-and-run AppDir yaas-x86_64.AppImage
+
+      - name: Upload AppImage as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: yaas_installer_linux
+          path: yaas-x86_64.AppImage
+
   release:
-    needs: build
+    needs: [build-windows, build-macos, build-linux-appimage]
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      # # Step 1: Check out the repository
-      # - name: Checkout code
-      #   uses: actions/checkout@v3
-      #
-      # # Step 2: Set up Python
-      # - name: Set up Python
-      #   uses: actions/setup-python@v4
-      #   with:
-      #     python-version: '3.12'  # Use the desired Python version
-      #
-      # # Step 3: Install toml package to parse pyproject.toml
-      # - name: Install dependencies
-      #   run: |
-      #     python -m pip install --upgrade pip
-      #     pip install toml
-
-      # # Step 4: Retrieve version from pyproject.toml
-      # - name: Get version from pyproject.toml
-      #   id: get_version
-      #   run: |
-      #     VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
-      #     echo "Version is $VERSION"
-      #     echo "VERSION=$VERSION" >> $GITHUB_ENV
-
-      - name: Download artifact
+      - name: Download all installer artifacts
         uses: actions/download-artifact@v4
         with:
-          name: yaas_installer
-          path: .
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          path: release-assets
+
+      - name: Create Release and upload assets
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
-      - name: upload windows artifact
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./yaas_installer.exe
-          asset_name: yaas_installer.exe
-          asset_content_type: application/vnd.microsoft.portable-executable
+          files: release-assets/*/*

@@ -4,16 +4,23 @@ import subprocess
 import sys
 
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
-                               QLabel, QLineEdit, QPushButton, QTextEdit,
-                               QMessageBox, QSizePolicy, QProgressBar)
-from PySide6.QtCore import (Qt, QDir, QStandardPaths, Slot)
+                               QHBoxLayout, QLabel, QLineEdit, QPushButton,
+                               QTextEdit, QMessageBox, QSizePolicy,
+                               QProgressBar, QToolButton, QMenu)
+from PySide6.QtCore import (Qt, QDir, QStandardPaths, QUrl, Slot)
+from PySide6.QtGui import QDesktopServices
 
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings
 from PySide6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
 from typing import NoReturn
 
+from . import __version__
 from .worker import Worker
+
+DOCUMENTATION_URL = "https://kleag.github.io/yaas/"
+ISSUES_URL = "https://github.com/kleag/yaas/issues"
+HOMEPAGE_URL = "https://github.com/kleag/yaas"
 
 try:
     from ctypes import windll  # Only exists on Windows.
@@ -33,6 +40,28 @@ class MainWindow(QWidget):
         self.setGeometry(100, 100, 1024, 768)
 
         self.layout = QVBoxLayout()
+
+        self.top_bar = QHBoxLayout()
+        self.menu_button = QToolButton()
+        self.menu_button.setText("☰")  # Hamburger icon (☰)
+        self.menu_button.setToolTip("Menu")
+        self.menu_button.setPopupMode(QToolButton.InstantPopup)
+        self.menu_button.setAutoRaise(True)
+        self.menu_button.setFixedSize(32, 32)
+        font = self.menu_button.font()
+        font.setPointSize(font.pointSize() + 4)
+        self.menu_button.setFont(font)
+
+        self.main_menu = QMenu(self.menu_button)
+        self.main_menu.addAction("Documentation", self.open_documentation)
+        self.main_menu.addAction("Report an Issue", self.open_issues)
+        self.main_menu.addSeparator()
+        self.main_menu.addAction("About Yaas", self.show_about)
+        self.menu_button.setMenu(self.main_menu)
+
+        self.top_bar.addWidget(self.menu_button)
+        self.top_bar.addStretch()
+        self.layout.addLayout(self.top_bar)
 
         self.label = QLabel("Enter YouTube URL:")
         self.layout.addWidget(self.label)
@@ -94,6 +123,25 @@ class MainWindow(QWidget):
     def update_line_edit(self, url):
         # Convert QUrl to string and set the text of QLineEdit
         self.url_input.setText(url.toString())
+
+    def show_about(self):
+        QMessageBox.about(
+            self,
+            "About Yaas",
+            f"<h3>Yaas (Yet Another Audio Splitter)</h3>"
+            f"<p>Version {__version__}</p>"
+            f"<p>Splits YouTube video soundtracks into separate stems "
+            f"(vocals, drums, bass, other, ...).</p>"
+            f"<p>Gaël de Chalendar, aka Kleag<br>"
+            f"(c) Gaël de Chalendar, 2024-2026</p>"
+            f"<p>Licensed under the Mozilla Public License 2.0 (MPL 2.0).</p>"
+            f"<p><a href=\"{HOMEPAGE_URL}\">{HOMEPAGE_URL}</a></p>")
+
+    def open_documentation(self):
+        QDesktopServices.openUrl(QUrl(DOCUMENTATION_URL))
+
+    def open_issues(self):
+        QDesktopServices.openUrl(QUrl(ISSUES_URL))
 
     def parse_args(self) -> argparse.Namespace:
         """
