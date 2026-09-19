@@ -60,3 +60,14 @@ uv pip install yaas
 
 On Windows, make sure you also have a working Python installation and
 ffmpeg installed (see above).
+
+## GPU acceleration
+
+The packaged Windows/macOS/Linux installers above bundle a CPU-only build of
+PyTorch (a CUDA-enabled build alone exceeds GitHub Releases' 2GB per-file
+limit), so track separation runs on CPU regardless of your hardware.
+
+Installing via `uv pip install yaas` / `pip install yaas` instead pulls the
+regular PyPI PyTorch build, which automatically uses a compatible CUDA GPU
+when one is available and falls back to CPU otherwise — no configuration
+needed.
