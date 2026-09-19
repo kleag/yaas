@@ -40,6 +40,9 @@ The ☰ button in the top-left corner opens a menu with:
 
 - **Documentation** — opens this site in your browser.
 - **Report an Issue** — opens the GitHub issue tracker.
+- **GPU Acceleration...** (Windows/Linux only) — install, reinstall, or
+  remove an on-demand CUDA-accelerated environment; see
+  [Installation](installation.md#enabling-gpu-acceleration-in-the-windowslinux-installers).
 - **About Yaas** — shows the installed version and license.
 
 ## Choosing a separation backend

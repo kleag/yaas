@@ -1,25 +1,15 @@
 import argparse
-import contextlib
-import importlib
 import sys
 import os
-import logging
 from PySide6.QtCore import (QThread, Signal, QStandardPaths, QDir)
 from pytubefix import YouTube, Playlist
 from pydub import AudioSegment
-import torch
-import torchaudio
-import os
-import openunmix
-from openunmix.predict import separate
 from yturl2mp3.config import Config
 from yturl2mp3.helpers import (convert_mp4_to_mp3, download_mp3,
                                is_valid_playlist_url, is_valid_video_url)
-try:
-    from audio_separator.separator import Separator
-    HAS_AUDIO_SEPARATOR = True
-except ImportError:
-    HAS_AUDIO_SEPARATOR = False
+from . import gpu_env
+from .separate_worker import (HAS_AUDIO_SEPARATOR, extract_with_audio_separator,
+                              extract_with_openunmix)
 
 
 class Worker(QThread):
@@ -45,6 +35,7 @@ class Worker(QThread):
         self.out = yaas.args.out
         self.backend_type = getattr(yaas.args, 'backend', 'openunmix')  # Default to openunmix
         self.model_type = getattr(yaas.args, 'model', 'roformer')  # Default to BS-Roformer-SW.ckpt
+        self.gpu_env_dir = os.path.join(self.app_data_path, gpu_env.GPU_ENV_DIRNAME)
         if not QDir().mkpath(self.out):
             self.update_status.emit(f"Failed to creat result dir {self.out}")
             raise RuntimeError(f"Failed to creat result dir {self.out}")
@@ -128,159 +119,26 @@ class Worker(QThread):
 
     def extract_tracks(self, flac_path):
         self.update_status.emit(f"Extracting tracks from flac {flac_path} with backend {self.backend_type}...")
-        if self.backend_type == "audio_separator":
-            if not HAS_AUDIO_SEPARATOR:
-                self.extraction_failed.emit("audio_separator library not installed. Please install it with 'pip install \"audio_separator[cpu]\"'")
-                return
-            self._extract_with_audio_separator(flac_path)
-        else:
-            # Default to openunmix
-            self._extract_with_openunmix(flac_path)
+        try:
+            if gpu_env.status(self.gpu_env_dir) == "ready":
+                self.update_status.emit("Using GPU-accelerated environment for extraction...")
+                gpu_env.run_extraction(
+                    self.gpu_env_dir, flac_path, self.out, self.backend_type,
+                    self.model_type, self.update_status.emit, self.progress.emit)
+            elif self.backend_type == "audio_separator":
+                if not HAS_AUDIO_SEPARATOR:
+                    self.extraction_failed.emit(
+                        "audio_separator library not installed. Please install "
+                        "it with 'pip install \"audio_separator[cpu]\"'")
+                    return
+                extract_with_audio_separator(
+                    flac_path, self.out, self.model_type,
+                    self.update_status.emit, self.progress.emit)
+            else:
+                # Default to openunmix
+                extract_with_openunmix(
+                    flac_path, self.out, self.update_status.emit, self.progress.emit)
+        except BaseException as ex:
+            self.extraction_failed.emit(f"Extraction failed with: {str(ex)}")
+            raise
         self.extraction_done.emit()
-
-    def _extract_with_openunmix(self, flac_path):
-        self.update_status.emit(f"Extracting tracks from flac {flac_path} with OpenUnmix...")
-        try:
-            # Load the model
-            model = openunmix.umxl()
-        except BaseException as ex:
-            self.extraction_failed.emit(f"Loading model failed with: {str(ex)}")
-            raise
-        try:
-            # Load the audio file
-            waveform, sample_rate = torchaudio.load(flac_path)
-            waveform = waveform.mean(dim=0, keepdim=True)  # Convert to mono
-            print(f"Loaded audio at: {sample_rate}MHz", file=sys.stderr)
-            self.update_status.emit(f"Loaded audio at: {sample_rate}MHz")
-
-        except BaseException as ex:
-            self.extraction_failed.emit(f"Converting to mono failed with: {str(ex)}")
-            raise
-        try:
-
-            # Perform source separation
-            estimates = separate(
-                waveform,
-                rate=44100,
-                # model_str_or_path="umxl",
-                # targets=None,
-                # niter=1,
-                # residual=False,
-                # wiener_win_len=300,
-                # aggregate_dict=None,
-                # separator=None,
-                # device=None,
-                # filterbank="torch",
-                )
-        except BaseException as ex:
-            self.extraction_failed.emit(f"Source separation failed with: {str(ex)}")
-            raise
-        try:
-
-            # Save each estimated source
-            for source, estimate in estimates.items():
-                # Extract the file name without the extension
-                file_name = os.path.splitext(os.path.basename(flac_path))[0]
-                # Create the new path
-                wav_path = os.path.join(self.out, f"{file_name}_{source}.wav")
-
-                self.update_status.emit(f'Writing result to {wav_path}')
-                torchaudio.save(
-                    wav_path,
-                    torch.squeeze(estimate).to("cpu"),
-                    sample_rate= sample_rate,
-                )
-                self.update_status.emit(f'Wrote {source} to {wav_path}')
-        except BaseException as ex:
-            self.extraction_failed.emit(f"Saving extracted tracks failed with: {str(ex)}")
-            raise
-
-    def _extract_with_audio_separator(self, flac_path):
-        self.update_status.emit(f"Extracting tracks from flac {flac_path} with {self.model_type}...")
-        try:
-            # Initialize audio separator
-            separator = Separator(
-                log_level=logging.INFO,
-                output_dir=self.out,
-                output_format="WAV",
-            )
-
-            # Map simple option names to actual model filenames
-            model_map = {
-                "roformer": "BS-Roformer-SW.ckpt",
-                "htdemucs6s": "htdemucs_6s.yaml"
-            }
-
-            # Load the specified model
-            model_filename = model_map.get(self.model_type, "BS-Roformer-SW.ckpt")  # Default to roformer
-            separator.load_model(model_filename=model_filename)
-
-            # Separate audio, reporting progress through the `progress` signal
-            # instead of the ASCII tqdm bar audio_separator draws on the terminal.
-            with self._redirect_separator_progress_to_qt():
-                output_files = separator.separate(flac_path)
-
-            # Process output files - audio_separator generates files in output directory
-            self.update_status.emit(f"Separation complete. Generated files: {output_files}")
-
-        except Exception as ex:
-            self.extraction_failed.emit(f"Audio separator failed with: {str(ex)}")
-            raise
-
-    @contextlib.contextmanager
-    def _redirect_separator_progress_to_qt(self):
-        """Intercept the tqdm progress bars used internally by audio_separator's
-        MDX/MDXC/VR/Demucs backends (including the roformer model) and report
-        them through the `progress` Qt signal instead of drawing an ASCII bar
-        on the terminal.
-        """
-        from tqdm import tqdm as base_tqdm
-
-        emit = self.progress.emit
-        devnull = open(os.devnull, "w")
-
-        class _QtProgressTqdm(base_tqdm):
-            def __init__(self, *args, **kwargs):
-                kwargs["file"] = devnull
-                super().__init__(*args, **kwargs)
-
-            def display(self, msg=None, pos=None):
-                if self.total:
-                    emit(int(self.n * 100 / self.total))
-
-        class _FakeTqdmModule:
-            tqdm = _QtProgressTqdm
-
-        # `mdx_separator`/`mdxc_separator`/`vr_separator` do `from tqdm import tqdm`,
-        # so the module-level name is the class itself. The demucs modules do
-        # `import tqdm` and call `tqdm.tqdm(...)`, so they need a fake module.
-        # Each architecture is imported independently and best-effort: some of
-        # them pull in heavy optional dependencies (e.g. mdx_separator needs
-        # onnx2torch/torchvision) that may not be usable in every environment,
-        # and that must not prevent patching (or using) the others.
-        module_specs = [
-            ("audio_separator.separator.architectures.mdx_separator", "tqdm", lambda m: _QtProgressTqdm),
-            ("audio_separator.separator.architectures.mdxc_separator", "tqdm", lambda m: _QtProgressTqdm),
-            ("audio_separator.separator.architectures.vr_separator", "tqdm", lambda m: _QtProgressTqdm),
-            ("audio_separator.separator.uvr_lib_v5.demucs.apply", "tqdm", lambda m: _FakeTqdmModule),
-            ("audio_separator.separator.uvr_lib_v5.demucs.utils", "tqdm", lambda m: _FakeTqdmModule),
-        ]
-        patches = []
-        for module_name, attr, replacement_for in module_specs:
-            try:
-                mod = importlib.import_module(module_name)
-            except Exception as ex:
-                self.update_status.emit(
-                    f"Progress bar: skipping {module_name} ({ex.__class__.__name__}: {ex})")
-                continue
-            patches.append((mod, attr, replacement_for(mod)))
-        originals = [(mod, attr, getattr(mod, attr)) for mod, attr, _ in patches]
-        for mod, attr, replacement in patches:
-            setattr(mod, attr, replacement)
-        try:
-            yield
-        finally:
-            for mod, attr, original in originals:
-                setattr(mod, attr, original)
-            devnull.close()
-            self.progress.emit(0)

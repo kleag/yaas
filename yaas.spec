@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import os
 import sys
 
 from PyInstaller.utils.hooks import collect_submodules
@@ -7,11 +8,21 @@ from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT, BUNDLE
 
 # block_cipher = None
 
+# The `uv` binary powers the on-demand GPU-acceleration environment (see
+# src/yaas/gpu_env.py): release.yml downloads the platform-matching release
+# of https://github.com/astral-sh/uv into ./bundled_uv/ before running
+# PyInstaller. Bundling is optional -- a local/dev build without that
+# directory just skips the GPU-acceleration menu entry at runtime (see
+# gpu_env.find_uv_binary()'s "uv on PATH" fallback for dev-mode testing).
+_uv_binary_name = 'uv.exe' if sys.platform == 'win32' else 'uv'
+_uv_binary_path = os.path.join('bundled_uv', _uv_binary_name)
+_bundled_binaries = [(_uv_binary_path, '.')] if os.path.exists(_uv_binary_path) else []
+
 a = Analysis(
     ['src/pyinstmain.py'],
     pathex=['.'],
-    binaries=[],
-    datas=[],
+    binaries=_bundled_binaries,
+    datas=[('src/yaas/separate_worker.py', '.')],
     hiddenimports=['PySide6', 'pytubefix', 'pydub', 'torch', 'torchaudio', 'torchcodec', 'openunmix', 'audio_separator', 'audioop', 'ffmpeg', 'soundfile'],
     hookspath=[],
     runtime_hooks=[],

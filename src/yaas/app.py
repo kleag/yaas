@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QHBoxLayout, QLabel, QLineEdit, QPushButton,
                                QTextEdit, QMessageBox, QSizePolicy,
                                QProgressBar, QToolButton, QMenu)
-from PySide6.QtCore import (Qt, QDir, QStandardPaths, QUrl, Slot)
+from PySide6.QtCore import (Qt, QDir, QStandardPaths, QThread, QUrl, Signal, Slot)
 from PySide6.QtGui import QDesktopServices
 
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -16,6 +16,7 @@ from PySide6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
 from typing import NoReturn
 
 from . import __version__
+from . import gpu_env
 from .worker import Worker
 
 DOCUMENTATION_URL = "https://kleag.github.io/yaas/"
@@ -28,6 +29,24 @@ try:
     windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 except ImportError:
     pass
+
+
+class GpuInstallThread(QThread):
+    status_update = Signal(str)
+    finished_ok = Signal()
+    failed = Signal(str)
+
+    def __init__(self, env_dir):
+        super().__init__()
+        self.env_dir = env_dir
+
+    def run(self):
+        try:
+            gpu_env.install(self.env_dir, self.status_update.emit)
+        except BaseException as ex:
+            self.failed.emit(str(ex))
+            return
+        self.finished_ok.emit()
 
 
 class MainWindow(QWidget):
@@ -52,9 +71,15 @@ class MainWindow(QWidget):
         font.setPointSize(font.pointSize() + 4)
         self.menu_button.setFont(font)
 
+        self.gpu_env_dir = os.path.join(
+            QStandardPaths.writableLocation(QStandardPaths.AppDataLocation),
+            gpu_env.GPU_ENV_DIRNAME)
+
         self.main_menu = QMenu(self.menu_button)
         self.main_menu.addAction("Documentation", self.open_documentation)
         self.main_menu.addAction("Report an Issue", self.open_issues)
+        if gpu_env.is_supported_platform():
+            self.main_menu.addAction("GPU Acceleration...", self.open_gpu_dialog)
         self.main_menu.addSeparator()
         self.main_menu.addAction("About Yaas", self.show_about)
         self.menu_button.setMenu(self.main_menu)
@@ -142,6 +167,71 @@ class MainWindow(QWidget):
 
     def open_issues(self):
         QDesktopServices.openUrl(QUrl(ISSUES_URL))
+
+    def open_gpu_dialog(self):
+        current_status = gpu_env.status(self.gpu_env_dir)
+        status_text = {
+            "not_installed": "Not installed.",
+            "stale": "Installed for a different Yaas version; reinstall recommended.",
+            "ready": "Installed and ready.",
+        }.get(current_status, current_status)
+
+        box = QMessageBox(self)
+        box.setWindowTitle("GPU Acceleration")
+        box.setText(
+            f"GPU acceleration status: {status_text}\n\n"
+            "This provisions a separate, self-contained Python environment "
+            "with CUDA-capable PyTorch, used automatically for extraction "
+            "when ready. Requires an NVIDIA GPU with CUDA support.")
+        install_label = "Reinstall" if current_status in ("ready", "stale") else "Install"
+        install_button = box.addButton(install_label, QMessageBox.AcceptRole)
+        remove_button = None
+        if current_status in ("ready", "stale"):
+            remove_button = box.addButton("Remove", QMessageBox.DestructiveRole)
+        box.addButton(QMessageBox.Cancel)
+        box.exec()
+
+        clicked = box.clickedButton()
+        if clicked == install_button:
+            self.confirm_and_install_gpu_env()
+        elif remove_button is not None and clicked == remove_button:
+            gpu_env.uninstall(self.gpu_env_dir)
+            self.update_status("GPU acceleration environment removed.")
+
+    def confirm_and_install_gpu_env(self):
+        confirm = QMessageBox.question(
+            self, "Install GPU Acceleration",
+            "This downloads several GB of GPU-accelerated libraries "
+            "(CUDA-enabled PyTorch and related packages). Continue?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if confirm != QMessageBox.Yes:
+            return
+
+        self.gpu_install_thread = GpuInstallThread(self.gpu_env_dir)
+        self.gpu_install_thread.status_update.connect(self.update_status)
+        self.gpu_install_thread.finished_ok.connect(self.gpu_install_finished_ok)
+        self.gpu_install_thread.failed.connect(self.gpu_install_failed)
+        self.progress_bar.setRange(0, 0)  # indeterminate
+        self.progress_bar.setValue(0)
+        self.progress_bar.show()
+        self.gpu_install_thread.start()
+
+    @Slot()
+    def gpu_install_finished_ok(self):
+        self.progress_bar.hide()
+        self.update_status("GPU acceleration environment installed.")
+        QMessageBox.information(
+            self, "GPU Acceleration",
+            "GPU acceleration environment installed. See the status log "
+            "above for whether a CUDA GPU was actually detected.")
+
+    @Slot(str)
+    def gpu_install_failed(self, message):
+        self.progress_bar.hide()
+        self.update_status(f"GPU acceleration install failed: {message}")
+        QMessageBox.critical(
+            self, "GPU Acceleration",
+            f"Installing the GPU acceleration environment failed:\n{message}")
 
     def parse_args(self) -> argparse.Namespace:
         """

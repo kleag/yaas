@@ -26,6 +26,14 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v3
 
+      - name: Bundle uv binary for the in-app GPU-acceleration feature
+        # Copies the uv binary this job just installed into ./bundled_uv/,
+        # where yaas.spec picks it up and bundles it into the frozen app
+        # (see src/yaas/gpu_env.py) -- no separate download needed.
+        run: |
+          New-Item -ItemType Directory -Force -Path bundled_uv | Out-Null
+          Copy-Item (Get-Command uv).Source bundled_uv\uv.exe
+
       - name: Install dependencies
         # Installs the CPU-only build of torch (see [tool.uv.sources] in
         # pyproject.toml): the CUDA-enabled default PyPI build alone pushes
@@ -103,6 +111,16 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v3
+
+      - name: Bundle uv binary for the in-app GPU-acceleration feature
+        # Copies the uv binary this job just installed into ./bundled_uv/,
+        # where yaas.spec picks it up and bundles it into the frozen app
+        # (see src/yaas/gpu_env.py) -- no separate download needed.
+        run: |
+          set -e
+          mkdir -p bundled_uv
+          cp "$(command -v uv)" bundled_uv/uv
+          chmod +x bundled_uv/uv
 
       - name: Install dependencies
         # Installs the CPU-only build of torch (see [tool.uv.sources] in
