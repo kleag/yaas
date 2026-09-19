@@ -32,6 +32,22 @@ a = Analysis(
 )
 #     cipher=block_cipher,
 
+if sys.platform.startswith('linux'):
+    # PyInstaller's static dependency scanner finds libxkbcommon.so.0 as a
+    # normal linked dependency of a bundled Qt library and bundles that
+    # build's copy, but Qt's XCB platform plugin also dlopen()s
+    # libxkbcommon-x11.so.0 at runtime -- invisible to the static scanner,
+    # so it's never bundled and always resolves from the system instead.
+    # libxkbcommon-x11 must match its base library's ABI exactly; mixing a
+    # bundled base with a system extension corrupts state and segfaults in
+    # libxkbcommon on the first real key event (confirmed via a crash
+    # report's core dump: SIGSEGV in the bundled libxkbcommon.so.0, called
+    # from libQt6XcbQpa.so.6, with libxkbcommon-x11.so.0 loaded from
+    # /usr/lib/x86_64-linux-gnu/). Excluding the bundled copy makes both
+    # consistently resolve from the system, which -- as a core dependency
+    # of any X11/Wayland desktop -- is always present anyway.
+    a.binaries = [b for b in a.binaries if not b[0].startswith('libxkbcommon')]
+
 pyz = PYZ(a.pure, a.zipped_data, cipher=None)
 
 exe = EXE(
