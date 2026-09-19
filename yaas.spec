@@ -3,7 +3,7 @@
 import os
 import sys
 
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT, BUNDLE
 
 # block_cipher = None
@@ -18,11 +18,28 @@ _uv_binary_name = 'uv.exe' if sys.platform == 'win32' else 'uv'
 _uv_binary_path = os.path.join('bundled_uv', _uv_binary_name)
 _bundled_binaries = [(_uv_binary_path, '.')] if os.path.exists(_uv_binary_path) else []
 
+# pytubefix (>=recent versions, see JuanBindez/pytubefix#209) shells out to a
+# Node.js binary to run YouTube's signature/PoToken-deciphering JS, via the
+# nodejs_wheel package. PyInstaller's static import scanner only bundles
+# nodejs_wheel's *.py files, never the actual node executable it ships as
+# package data, nor pytubefix's own runner.js/botGuard.js data files --
+# leaving all of them missing from the frozen app and pytubefix unable to
+# download anything. Locate them the same way pytubefix itself does, so the
+# bundled path always matches exactly what it looks for at runtime.
+try:
+    from pytubefix.sig_nsig.node_runner import NodeRunner as _NodeRunner
+    _node_source_path = _NodeRunner._node_path()
+    _node_dest_dir = 'nodejs_wheel' if sys.platform == 'win32' else 'nodejs_wheel/bin'
+    _bundled_binaries.append((_node_source_path, _node_dest_dir))
+except Exception as _ex:
+    print(f"WARNING: could not locate the nodejs_wheel node binary to bundle "
+          f"it ({_ex}); pytubefix downloads will likely fail in the frozen app.")
+
 a = Analysis(
     ['src/pyinstmain.py'],
     pathex=['.'],
     binaries=_bundled_binaries,
-    datas=[('src/yaas/separate_worker.py', '.')],
+    datas=[('src/yaas/separate_worker.py', '.')] + collect_data_files('pytubefix'),
     hiddenimports=['PySide6', 'pytubefix', 'pydub', 'torch', 'torchaudio', 'torchcodec', 'openunmix', 'audio_separator', 'audioop', 'ffmpeg', 'soundfile'],
     hookspath=[],
     runtime_hooks=[],
