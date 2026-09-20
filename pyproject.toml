@@ -37,6 +37,7 @@ dependencies = [
     "pytubefix>=11.1.0",
     "PySoundFile>=0.9.0",
     "audioop-lts>=0.2.2; python_version>='3.13'",
+    "audioread>=3.0.1",
     "audio_separator[cpu]>=0.47.0"
 ]
 keywords = ["audio", "video", "track", "split", "gui", "qt"]
