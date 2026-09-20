@@ -3,7 +3,7 @@
 import os
 import sys
 
-from PyInstaller.utils.hooks import collect_submodules, collect_data_files
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files, copy_metadata
 from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT, BUNDLE
 
 # block_cipher = None
@@ -39,7 +39,15 @@ a = Analysis(
     ['src/pyinstmain.py'],
     pathex=['.'],
     binaries=_bundled_binaries,
-    datas=[('src/yaas/separate_worker.py', '.')] + collect_data_files('pytubefix'),
+    # audio_separator's own __init__ unconditionally does
+    # metadata.distribution("audio-separator").version to log its version;
+    # frozen bundles don't include .dist-info metadata by default, so that
+    # lookup raises PackageNotFoundError, audio_separator's own helper
+    # swallows it and returns None, and `.version` on that None crashes
+    # every extraction attempt ('NoneType' object has no attribute
+    # 'version'). copy_metadata makes the .dist-info available again.
+    datas=([('src/yaas/separate_worker.py', '.')] + collect_data_files('pytubefix')
+           + copy_metadata('audio-separator')),
     hiddenimports=['PySide6', 'pytubefix', 'pydub', 'torch', 'torchaudio', 'torchcodec', 'openunmix', 'audio_separator', 'audioop', 'ffmpeg', 'soundfile', 'audioread'],
     hookspath=[],
     runtime_hooks=[],
