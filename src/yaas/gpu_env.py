@@ -144,7 +144,8 @@ def uninstall(env_dir):
     shutil.rmtree(env_dir, ignore_errors=True)
 
 
-def run_extraction(env_dir, flac_path, out_dir, backend, model, status_cb, progress_cb):
+def run_extraction(env_dir, flac_path, out_dir, backend, model, status_cb, progress_cb,
+                   model_dir=None):
     """Runs separate_worker.py as a subprocess inside the GPU env, parsing
     its stdout protocol (YAAS_STATUS/YAAS_PROGRESS/YAAS_ERROR/YAAS_DONE)
     into the same status_cb/progress_cb callbacks the in-process path uses."""
@@ -152,6 +153,8 @@ def run_extraction(env_dir, flac_path, out_dir, backend, model, status_cb, progr
         env_python(env_dir), _separate_worker_script(),
         flac_path, out_dir, "--backend", backend, "--model", model,
     ]
+    if model_dir:
+        cmd += ["--model-dir", model_dir]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, bufsize=1)
     error_message = None

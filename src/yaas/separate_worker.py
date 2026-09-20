@@ -22,7 +22,14 @@ from openunmix.predict import separate
 try:
     from audio_separator.separator import Separator
     HAS_AUDIO_SEPARATOR = True
-except ImportError:
+except Exception:
+    # Broad except (not just ImportError): a partially-broken frozen build
+    # can fail with OSError/RuntimeError/etc. deep in a transitive import
+    # too. Print the real cause instead of silently degrading to "not
+    # installed" -- that message previously hid two separate packaging bugs
+    # (missing soundfile/nodejs_wheel files) behind a generic message.
+    import traceback
+    traceback.print_exc(file=sys.stderr)
     HAS_AUDIO_SEPARATOR = False
 
 MODEL_MAP = {
@@ -53,18 +60,30 @@ def extract_with_openunmix(flac_path, out_dir, status_cb, progress_cb):
         status_cb(f'Wrote {source} to {wav_path}')
 
 
-def extract_with_audio_separator(flac_path, out_dir, model_type, status_cb, progress_cb):
+def extract_with_audio_separator(flac_path, out_dir, model_type, status_cb, progress_cb,
+                                 model_dir=None):
     status_cb(f"Extracting tracks from flac {flac_path} with {model_type}...")
     if not HAS_AUDIO_SEPARATOR:
         raise RuntimeError(
             "audio_separator library not installed. "
             "Please install it with 'pip install \"audio_separator[cpu]\"'")
 
-    separator = Separator(
-        log_level=logging.INFO,
-        output_dir=out_dir,
-        output_format="WAV",
-    )
+    separator_kwargs = {
+        "log_level": logging.INFO,
+        "output_dir": out_dir,
+        "output_format": "WAV",
+    }
+    if model_dir:
+        # audio_separator's own default (/tmp/audio-separator-models/) isn't
+        # a persistent location on most Linux systems (/tmp is commonly
+        # wiped on every reboot), which would force a multi-GB model
+        # re-download on the next run. Point it at a proper persistent
+        # cache directory instead so downloaded models are kept for future
+        # extractions, the same way OpenUnmix's models already are (via
+        # torch.hub's own persistent ~/.cache).
+        os.makedirs(model_dir, exist_ok=True)
+        separator_kwargs["model_file_dir"] = model_dir
+    separator = Separator(**separator_kwargs)
 
     model_filename = MODEL_MAP.get(model_type, "BS-Roformer-SW.ckpt")
     separator.load_model(model_filename=model_filename)
@@ -133,9 +152,10 @@ def _redirect_separator_progress(progress_cb, status_cb):
         progress_cb(0)
 
 
-def extract(flac_path, out_dir, backend, model, status_cb, progress_cb):
+def extract(flac_path, out_dir, backend, model, status_cb, progress_cb, model_dir=None):
     if backend == "audio_separator":
-        extract_with_audio_separator(flac_path, out_dir, model, status_cb, progress_cb)
+        extract_with_audio_separator(flac_path, out_dir, model, status_cb, progress_cb,
+                                     model_dir=model_dir)
     else:
         extract_with_openunmix(flac_path, out_dir, status_cb, progress_cb)
 
@@ -150,6 +170,8 @@ def _cli_main():
                         choices=["audio_separator", "openunmix"])
     parser.add_argument("--model", default="roformer",
                         choices=["roformer", "htdemucs6s"])
+    parser.add_argument("--model-dir", default=None,
+                        help="Persistent directory to cache audio_separator models in.")
     args = parser.parse_args()
 
     def status_cb(message):
@@ -160,7 +182,7 @@ def _cli_main():
 
     try:
         extract(args.flac_path, args.out_dir, args.backend, args.model,
-                status_cb, progress_cb)
+                status_cb, progress_cb, model_dir=args.model_dir)
     except BaseException as ex:
         print(f"YAAS_ERROR {ex.__class__.__name__}: {ex}", flush=True)
         return 1

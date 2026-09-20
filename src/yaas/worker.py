@@ -36,6 +36,13 @@ class Worker(QThread):
         self.backend_type = getattr(yaas.args, 'backend', 'openunmix')  # Default to openunmix
         self.model_type = getattr(yaas.args, 'model', 'roformer')  # Default to BS-Roformer-SW.ckpt
         self.gpu_env_dir = os.path.join(self.app_data_path, gpu_env.GPU_ENV_DIRNAME)
+        # audio_separator's own default model cache dir is /tmp/..., which
+        # isn't persistent on most Linux systems (/tmp is commonly wiped on
+        # reboot). Use Qt's cross-platform cache location instead, so
+        # downloaded models are kept for future runs.
+        self.models_dir = os.path.join(
+            QStandardPaths.writableLocation(QStandardPaths.CacheLocation),
+            "audio-separator-models")
         if not QDir().mkpath(self.out):
             self.update_status.emit(f"Failed to creat result dir {self.out}")
             raise RuntimeError(f"Failed to creat result dir {self.out}")
@@ -124,7 +131,8 @@ class Worker(QThread):
                 self.update_status.emit("Using GPU-accelerated environment for extraction...")
                 gpu_env.run_extraction(
                     self.gpu_env_dir, flac_path, self.out, self.backend_type,
-                    self.model_type, self.update_status.emit, self.progress.emit)
+                    self.model_type, self.update_status.emit, self.progress.emit,
+                    model_dir=self.models_dir)
             elif self.backend_type == "audio_separator":
                 if not HAS_AUDIO_SEPARATOR:
                     self.extraction_failed.emit(
@@ -133,7 +141,8 @@ class Worker(QThread):
                     return
                 extract_with_audio_separator(
                     flac_path, self.out, self.model_type,
-                    self.update_status.emit, self.progress.emit)
+                    self.update_status.emit, self.progress.emit,
+                    model_dir=self.models_dir)
             else:
                 # Default to openunmix
                 extract_with_openunmix(
