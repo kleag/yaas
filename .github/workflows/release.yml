@@ -56,7 +56,14 @@ jobs:
           name: yaas_installer_windows
           path: yaas_installer.exe
 
-  build-macos:
+  build-macos-arm64:
+    # macos-latest is Apple Silicon (arm64). PyInstaller doesn't
+    # cross-compile -- it builds a native binary for whatever architecture
+    # it runs on -- so an arm64-only .dmg here needs a separate x86_64 job
+    # (below) on an Intel runner to also support Intel Macs. A single
+    # "universal2" build isn't realistic: it needs every dependency to ship
+    # universal2 wheels too, and this app's heavy CPU-only torch/onnxruntime
+    # stack doesn't.
     runs-on: macos-latest
 
     steps:
@@ -85,13 +92,55 @@ jobs:
 
       - name: Build DMG
         run: |
-          hdiutil create -volname Yaas -srcfolder dist/yaas.app -ov -format UDZO yaas_installer.dmg
+          hdiutil create -volname Yaas -srcfolder dist/yaas.app -ov -format UDZO yaas_installer_arm64.dmg
 
       - name: Upload installer as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: yaas_installer_macos
-          path: yaas_installer.dmg
+          name: yaas_installer_macos_arm64
+          path: yaas_installer_arm64.dmg
+
+  build-macos-x86_64:
+    # macos-13 is the last GitHub-hosted Intel Mac runner (macos-14+ are all
+    # arm64). Not a permanent guarantee -- GitHub/Apple are winding down
+    # Intel runner support over time -- but it's the only way to get a
+    # native x86_64 build today. See build-macos-arm64 above for why this
+    # is a separate job rather than one universal2 build.
+    runs-on: macos-13
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        # Installs the CPU-only build of torch (see [tool.uv.sources] in
+        # pyproject.toml): the CUDA-enabled default PyPI build alone pushes
+        # the frozen installer well past GitHub Releases' 2GB asset limit.
+        run: uv pip install --system .
+
+      - name: Install pyinstaller
+        run: uv pip install --system pyinstaller
+
+      - name: Build app bundle with pyinstaller
+        run: pyinstaller yaas.spec
+
+      - name: Build DMG
+        run: |
+          hdiutil create -volname Yaas -srcfolder dist/yaas.app -ov -format UDZO yaas_installer_x86_64.dmg
+
+      - name: Upload installer as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: yaas_installer_macos_x86_64
+          path: yaas_installer_x86_64.dmg
 
   build-linux-appimage:
     runs-on: ubuntu-latest
@@ -181,7 +230,7 @@ jobs:
           path: yaas-x86_64.AppImage
 
   release:
-    needs: [build-windows, build-macos, build-linux-appimage]
+    needs: [build-windows, build-macos-arm64, build-macos-x86_64, build-linux-appimage]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     permissions:

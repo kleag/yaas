@@ -16,9 +16,14 @@ winget install ffmpeg
 
 ## macOS: using the installer
 
-Grab the latest `yaas_installer.dmg` from the
+Grab the latest installer matching your Mac's chip from the
 [GitHub Releases page](https://github.com/kleag/yaas/releases), open it, and
-drag Yaas into `/Applications`.
+drag Yaas into `/Applications`:
+
+- **Apple Silicon** (M1/M2/M3/...): `yaas_installer_arm64.dmg`
+- **Intel**: `yaas_installer_x86_64.dmg`
+
+Not sure which you have? Apple menu → About This Mac shows the chip.
 
 !!! warning "Unsigned application"
     This build isn't signed or notarized by an Apple Developer account, so
