@@ -60,7 +60,6 @@ class MainWindow(QWidget):
 
         self.layout = QVBoxLayout()
 
-        self.top_bar = QHBoxLayout()
         self.menu_button = QToolButton()
         self.menu_button.setText("☰")  # Hamburger icon (☰)
         self.menu_button.setToolTip("Menu")
@@ -84,16 +83,16 @@ class MainWindow(QWidget):
         self.main_menu.addAction("About Yaas", self.show_about)
         self.menu_button.setMenu(self.main_menu)
 
-        self.top_bar.addWidget(self.menu_button)
-        self.top_bar.addStretch()
-        self.layout.addLayout(self.top_bar)
-
         self.label = QLabel("Enter YouTube URL:")
-        self.layout.addWidget(self.label)
 
         self.url_input = QLineEdit(initial_url)
-        self.layout.addWidget(self.url_input)
         self.url_input.editingFinished.connect(self.url_changed)
+
+        self.url_bar = QHBoxLayout()
+        self.url_bar.addWidget(self.label)
+        self.url_bar.addWidget(self.url_input)
+        self.url_bar.addWidget(self.menu_button)
+        self.layout.addLayout(self.url_bar)
 
         self.browser = QWebEngineView()
         # Set up a persistent profile
