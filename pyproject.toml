@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "yaas"
-version = "0.11.2"
+version = "0.11.3"
 description = "A tool to split video soundtracks into separate tracks using OpenUnmix (with optional audio-separator backend support)"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -66,7 +66,7 @@ yaas = ["resources/*.png", "resources/*.ico", "resources/*.icns", "resources/*.s
 
 
 [tool.bumpver]
-current_version = "0.11.2"
+current_version = "0.11.3"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message = "Bump version {old_version} -> {new_version}"
 tag_message = "{new_version}"
