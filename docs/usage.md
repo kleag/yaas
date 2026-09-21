@@ -24,8 +24,9 @@ yaas
 1. Use the embedded browser to search for or navigate to the video you want.
 2. Click **Start**.
 3. Wait — separation can take a while, especially on CPU.
-4. Find the resulting stems in the output directory (`$HOME/yaas_tracks` by
-   default; override with `--out`).
+4. Find the resulting stems in the output folder set in **Settings...**
+   (`$HOME/yaas_tracks` by default; `--out` overrides it for a single run
+   without changing the saved setting).
 
 If you want to interrupt an extraction, click **Stop**, which replaces
 **Start** while a job is running.
@@ -36,8 +37,10 @@ If you want to interrupt an extraction, click **Stop**, which replaces
 
 ## The menu
 
-The ☰ button in the top-left corner opens a menu with:
+The ☰ button to the right of the URL bar opens a menu with:
 
+- **Settings...** — set the output folder extracted stems are written to,
+  picked via your system's native folder picker.
 - **Documentation** — opens this site in your browser.
 - **Report an Issue** — opens the GitHub issue tracker.
 - **GPU Acceleration...** (Windows/Linux only) — install, reinstall, or
@@ -72,6 +75,6 @@ yaas --backend openunmix
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `-o`, `--out DIR` | `$HOME/yaas_tracks` | Directory to store the output files in. |
+| `-o`, `--out DIR` | Settings dialog's output folder | Directory to store the output files in, for this run only. |
 | `--backend {audio_separator,openunmix}` | `audio_separator` | Track separation backend. |
 | `--model {roformer,htdemucs6s}` | `roformer` | Model used by the `audio_separator` backend. |

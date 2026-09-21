@@ -53,8 +53,9 @@ yaas
 
 Search the video from which you want to extract the sound tracks using the
 integrated browser, click the Start button, wait (it can be long), and then use
-the generated audio files. Those are put by default in `$HOME/yaas_tracks`. You
-can change the destination dir with the `--out` option.
+the generated audio files. Those are put by default in `$HOME/yaas_tracks`; change
+the destination folder any time from the ☰ menu's **Settings...** entry, or
+override it for a single run with the `--out` option.
 
 If you want to interrupt an extraction, just click the `Stop` button that
 replaces the `Start` button during work.

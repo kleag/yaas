@@ -6,8 +6,9 @@ import sys
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QHBoxLayout, QLabel, QLineEdit, QPushButton,
                                QTextEdit, QMessageBox, QSizePolicy,
-                               QProgressBar, QToolButton, QMenu)
-from PySide6.QtCore import (Qt, QDir, QStandardPaths, QThread, QUrl, Signal, Slot)
+                               QProgressBar, QToolButton, QMenu, QDialog,
+                               QFormLayout, QDialogButtonBox, QFileDialog)
+from PySide6.QtCore import (Qt, QStandardPaths, QThread, QUrl, Signal, Slot)
 from PySide6.QtGui import QDesktopServices
 
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -17,6 +18,7 @@ from typing import NoReturn
 
 from . import __version__
 from . import gpu_env
+from . import settings
 from .worker import Worker
 
 DOCUMENTATION_URL = "https://kleag.github.io/yaas/"
@@ -49,11 +51,53 @@ class GpuInstallThread(QThread):
         self.finished_ok.emit()
 
 
+class SettingsDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Settings")
+        self.setMinimumWidth(480)
+
+        self.output_dir = settings.get_output_dir()
+
+        form = QFormLayout()
+
+        self.output_dir_row = QHBoxLayout()
+        self.output_dir_input = QLineEdit(self.output_dir)
+        self.output_dir_input.setReadOnly(True)
+        self.output_dir_row.addWidget(self.output_dir_input)
+        self.browse_button = QPushButton("Browse...")
+        self.browse_button.clicked.connect(self.browse_output_dir)
+        self.output_dir_row.addWidget(self.browse_button)
+        form.addRow("Output folder:", self.output_dir_row)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.save)
+        buttons.rejected.connect(self.reject)
+
+        layout = QVBoxLayout()
+        layout.addLayout(form)
+        layout.addWidget(buttons)
+        self.setLayout(layout)
+
+    def browse_output_dir(self):
+        chosen = QFileDialog.getExistingDirectory(
+            self, "Select Output Folder", self.output_dir)
+        if chosen:
+            self.output_dir = chosen
+            self.output_dir_input.setText(chosen)
+
+    def save(self):
+        settings.set_output_dir(self.output_dir)
+        self.accept()
+
+
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
         initial_url= "https://www.youtube.com"
         self.args = self.parse_args()
+        if not self.args.out:
+            self.args.out = settings.get_output_dir()
 
         self.setWindowTitle("YouTube Audio Splitter")
         self.setGeometry(100, 100, 1024, 768)
@@ -75,6 +119,8 @@ class MainWindow(QWidget):
             gpu_env.GPU_ENV_DIRNAME)
 
         self.main_menu = QMenu(self.menu_button)
+        self.main_menu.addAction("Settings...", self.open_settings_dialog)
+        self.main_menu.addSeparator()
         self.main_menu.addAction("Documentation", self.open_documentation)
         self.main_menu.addAction("Report an Issue", self.open_issues)
         if gpu_env.is_supported_platform():
@@ -161,6 +207,12 @@ class MainWindow(QWidget):
             f"<p>Licensed under the Mozilla Public License 2.0 (MPL 2.0).</p>"
             f"<p><a href=\"{HOMEPAGE_URL}\">{HOMEPAGE_URL}</a></p>")
 
+    def open_settings_dialog(self):
+        dialog = SettingsDialog(self)
+        if dialog.exec() == QDialog.Accepted:
+            self.args.out = settings.get_output_dir()
+            self.update_status(f"Output folder set to {self.args.out}")
+
     def open_documentation(self):
         QDesktopServices.openUrl(QUrl(DOCUMENTATION_URL))
 
@@ -243,8 +295,10 @@ class MainWindow(QWidget):
 
         parser.add_argument(
             '-o', '--out', metavar="DIR", type=str,
-            default=os.path.join(QDir.homePath(), "yaas_tracks"),
-            help="The directory in which to store the downloaded MP3 files.")
+            default=None,
+            help="The directory in which to store the downloaded MP3 files. "
+                 "Overrides the Settings dialog's output folder for this run "
+                 "only; defaults to it if not given.")
         
         parser.add_argument(
             '--backend', metavar="BACKEND", type=str,
