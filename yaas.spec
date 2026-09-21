@@ -46,8 +46,13 @@ a = Analysis(
     # swallows it and returns None, and `.version` on that None crashes
     # every extraction attempt ('NoneType' object has no attribute
     # 'version'). copy_metadata makes the .dist-info available again.
+    # audio_separator also ships its own top-level data files (models.json,
+    # models-scores.json, model-data.json, ensemble_presets.json) that it
+    # reads relative to its own package directory at runtime; same story as
+    # pytubefix's JS files above -- collect_data_files() sweeps up all of
+    # them so they don't need discovering one crash at a time.
     datas=([('src/yaas/separate_worker.py', '.')] + collect_data_files('pytubefix')
-           + copy_metadata('audio-separator')),
+           + collect_data_files('audio_separator') + copy_metadata('audio-separator')),
     hiddenimports=['PySide6', 'pytubefix', 'pydub', 'torch', 'torchaudio', 'torchcodec', 'openunmix', 'audio_separator', 'audioop', 'ffmpeg', 'soundfile', 'audioread'],
     hookspath=[],
     runtime_hooks=[],
