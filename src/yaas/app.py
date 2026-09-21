@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QProgressBar, QToolButton, QMenu, QDialog,
                                QFormLayout, QDialogButtonBox, QFileDialog)
 from PySide6.QtCore import (Qt, QStandardPaths, QThread, QUrl, Signal, Slot)
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QDesktopServices, QIcon
 
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings
@@ -24,6 +24,21 @@ from .worker import Worker
 DOCUMENTATION_URL = "https://kleag.github.io/yaas/"
 ISSUES_URL = "https://github.com/kleag/yaas/issues"
 HOMEPAGE_URL = "https://github.com/kleag/yaas"
+
+
+def icon_path():
+    """Locate the app icon, bundled into the frozen app on Windows/Linux the
+    same way as separate_worker.py (see gpu_env.py), or shipped as package
+    data next to this module for a source/pip-installed run. Windows uses
+    the .ico (multi-resolution, crisper for title bar/taskbar); everywhere
+    else uses the plain PNG."""
+    name = "icon.ico" if sys.platform == "win32" else "icon.png"
+    if getattr(sys, "frozen", False):
+        candidate = os.path.join(sys._MEIPASS, "yaas", "resources", name)
+        if os.path.exists(candidate):
+            return candidate
+    return os.path.join(os.path.dirname(__file__), "resources", name)
+
 
 try:
     from ctypes import windll  # Only exists on Windows.
@@ -100,6 +115,7 @@ class MainWindow(QWidget):
             self.args.out = settings.get_output_dir()
 
         self.setWindowTitle("YouTube Audio Splitter")
+        self.setWindowIcon(QIcon(icon_path()))
         self.setGeometry(100, 100, 1024, 768)
 
         self.layout = QVBoxLayout()
@@ -443,6 +459,7 @@ def main():
     # Forces proper graphics communication in Qt6
     QApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True)
     app = QApplication(sys.argv)
+    app.setWindowIcon(QIcon(icon_path()))
 
     main_window = MainWindow()
     main_window.check_ffmpeg()

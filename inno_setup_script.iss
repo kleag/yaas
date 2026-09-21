@@ -10,6 +10,7 @@ AppPublisherURL=https://github.com/kleag/yaas
 AppContact=kleagg@gmail.com
 DefaultDirName={autopf}\YAAS
 DefaultGroupName=Yaas
+SetupIconFile=src\yaas\resources\icon.ico
 OutputDir=.
 ; OutputBaseFilename=yaas_installer-{#SetupSetting("AppVersion")}
 OutputBaseFilename=yaas_installer

@@ -51,7 +51,8 @@ a = Analysis(
     # reads relative to its own package directory at runtime; same story as
     # pytubefix's JS files above -- collect_data_files() sweeps up all of
     # them so they don't need discovering one crash at a time.
-    datas=([('src/yaas/separate_worker.py', '.')] + collect_data_files('pytubefix')
+    datas=([('src/yaas/separate_worker.py', '.'), ('src/yaas/resources', 'yaas/resources')]
+           + collect_data_files('pytubefix')
            + collect_data_files('audio_separator') + copy_metadata('audio-separator')),
     # audio_separator picks its architecture implementation (MDX/MDXC/VR/
     # Demucs) via importlib.import_module(f"...architectures.{module_name}")
@@ -107,6 +108,7 @@ exe = EXE(
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,
+    icon='src/yaas/resources/icon.ico' if sys.platform == 'win32' else None,
 )
 #     exclude_binaries=True,
 #     disable_windowed_traceback=False,
@@ -126,6 +128,6 @@ if sys.platform == 'darwin':
     app = BUNDLE(
         exe,
         name='yaas.app',
-        icon=None,
+        icon='src/yaas/resources/icon.icns',
         bundle_identifier='com.kleag.yaas',
     )

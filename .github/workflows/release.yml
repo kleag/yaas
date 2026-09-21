@@ -206,15 +206,7 @@ jobs:
           EOF
           chmod +x AppDir/AppRun
 
-          uv pip install --system pillow
-          python3 -c "
-          from PIL import Image, ImageDraw
-          img = Image.new('RGBA', (256, 256), (30, 30, 30, 255))
-          d = ImageDraw.Draw(img)
-          d.ellipse((28, 28, 228, 228), fill=(90, 150, 230, 255))
-          d.text((100, 118), 'Y', fill=(255, 255, 255, 255))
-          img.save('AppDir/yaas.png')
-          "
+          cp src/yaas/resources/icon.png AppDir/yaas.png
 
       - name: Build AppImage
         run: |

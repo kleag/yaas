@@ -61,6 +61,9 @@ Homepage = "https://github.com/kleag/yaas"
 [project.scripts]
 yaas = "yaas.app:main"
 
+[tool.setuptools.package-data]
+yaas = ["resources/*.png", "resources/*.ico", "resources/*.icns", "resources/*.svg"]
+
 
 [tool.bumpver]
 current_version = "0.11.1"

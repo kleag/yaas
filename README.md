@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.png">
+  <img alt="Yaas" src="docs/assets/logo-light.png" width="300">
+</picture>
+
 # Yet Another Audio Splitter
 
 This is Yaas 0.11.1, a tool to split video soundtracks into separate tracks
