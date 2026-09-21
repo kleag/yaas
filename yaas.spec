@@ -53,7 +53,19 @@ a = Analysis(
     # them so they don't need discovering one crash at a time.
     datas=([('src/yaas/separate_worker.py', '.')] + collect_data_files('pytubefix')
            + collect_data_files('audio_separator') + copy_metadata('audio-separator')),
-    hiddenimports=['PySide6', 'pytubefix', 'pydub', 'torch', 'torchaudio', 'torchcodec', 'openunmix', 'audio_separator', 'audioop', 'ffmpeg', 'soundfile', 'audioread'],
+    # audio_separator picks its architecture implementation (MDX/MDXC/VR/
+    # Demucs) via importlib.import_module(f"...architectures.{module_name}")
+    # with a name built at runtime -- invisible to PyInstaller's static
+    # scanner, so none of those submodules get bundled at all and loading
+    # any model fails with "No module named
+    # 'audio_separator.separator.architectures'". Given how many separate
+    # audio_separator packaging gaps have turned up already (missing data
+    # files, missing metadata, this dynamic-import one), collect *all* of
+    # its submodules rather than chasing individual subpackages one crash
+    # at a time.
+    hiddenimports=(['PySide6', 'pytubefix', 'pydub', 'torch', 'torchaudio', 'torchcodec',
+                    'openunmix', 'audioop', 'ffmpeg', 'soundfile', 'audioread']
+                   + collect_submodules('audio_separator')),
     hookspath=[],
     runtime_hooks=[],
     excludes=[],

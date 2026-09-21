@@ -137,7 +137,14 @@ def _redirect_separator_progress(progress_cb, status_cb):
         try:
             mod = importlib.import_module(module_name)
         except Exception as ex:
-            status_cb(f"Progress bar: skipping {module_name} ({ex.__class__.__name__}: {ex})")
+            # Expected/routine for architectures the current run isn't even
+            # using (e.g. mdx_separator failing to import on an environment
+            # with a torch/torchvision mismatch is harmless when the actual
+            # model in use is MDXC or Demucs) -- this is a debugging detail,
+            # not something a user needs to see in the app's status log, so
+            # it goes to stderr only rather than through status_cb.
+            print(f"Progress bar: skipping {module_name} ({ex.__class__.__name__}: {ex})",
+                  file=sys.stderr)
             continue
         patches.append((mod, attr, replacement_for(mod)))
     originals = [(mod, attr, getattr(mod, attr)) for mod, attr, _ in patches]
