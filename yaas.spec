@@ -63,6 +63,10 @@ a = Analysis(
     # them so they don't need discovering one crash at a time.
     datas=([('src/yaas/separate_worker.py', '.'), ('src/yaas/resources', 'yaas/resources')]
            + collect_data_files('pytubefix')
+           # certifi's cacert.pem: yaas.app falls back to it when the
+           # frozen app's OpenSSL finds no system CA bundle (always the
+           # case with python.org's macOS Python).
+           + collect_data_files('certifi')
            + collect_data_files('audio_separator') + copy_metadata('audio-separator')),
     # audio_separator picks its architecture implementation (MDX/MDXC/VR/
     # Demucs) via importlib.import_module(f"...architectures.{module_name}")

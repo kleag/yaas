@@ -30,6 +30,41 @@ def _setup_ffmpeg_path():
 
 _setup_ffmpeg_path()
 
+
+def _setup_ssl_certificates():
+    """Give Python's ssl module a CA bundle when the system one is missing.
+
+    A frozen app's OpenSSL looks for CA certificates at the path compiled
+    into the *build machine's* Python. With python.org's macOS build that's
+    a cert.pem inside its own framework, which doesn't exist on users'
+    Macs, so every HTTPS request from Python (pytubefix's downloads
+    included) fails with "certificate verify failed". The embedded browser
+    is unaffected, as Qt WebEngine has its own certificate handling. Only
+    fall back to certifi's bundle when neither default location exists, so
+    a working system store (with any locally added CAs) is kept, and never
+    override an SSL_CERT_FILE the user set themselves.
+
+    Must run before anything in the process makes a TLS connection:
+    OpenSSL reads SSL_CERT_FILE once, on first use, and ignores later
+    changes (confirmed: setting it after a failed request doesn't help)."""
+    import ssl
+    if os.environ.get("SSL_CERT_FILE"):
+        return
+    paths = ssl.get_default_verify_paths()
+    # An existing but empty capath is common too (python.org's Python
+    # installed without running its "Install Certificates" script).
+    if paths.cafile or (paths.capath and os.path.isdir(paths.capath)
+                        and os.listdir(paths.capath)):
+        return
+    try:
+        import certifi
+    except ImportError:
+        return
+    os.environ["SSL_CERT_FILE"] = certifi.where()
+
+
+_setup_ssl_certificates()
+
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QHBoxLayout, QLabel, QLineEdit, QPushButton,
                                QTextEdit, QMessageBox, QSizePolicy,
