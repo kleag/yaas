@@ -69,10 +69,11 @@ ffmpeg installed (see above).
 
 ## GPU acceleration
 
-The packaged Windows/macOS/Linux installers above bundle a CPU-only build of
+The packaged Windows and Linux installers above bundle a CPU-only build of
 PyTorch (a CUDA-enabled build alone exceeds GitHub Releases' 2GB per-file
 limit), so track separation runs on CPU by default regardless of your
-hardware.
+hardware. The macOS installer is different: see
+[GPU acceleration on macOS](#gpu-acceleration-on-macos) below.
 
 Installing via `uv pip install yaas` / `pip install yaas` instead pulls the
 regular PyPI PyTorch build, which automatically uses a compatible CUDA GPU
@@ -89,4 +90,10 @@ automatically for extraction whenever it's present. Use the same menu entry
 later to check its status, reinstall it (e.g. after upgrading Yaas), or
 remove it.
 
-This isn't available on macOS, since Apple hardware has no CUDA support.
+### GPU acceleration on macOS
+
+Apple hardware has no CUDA support, but on Apple Silicon Macs (M1 and later)
+Yaas uses the GPU through Apple's Metal (MPS) backend out of the box, with
+both the macOS dmg installer and `pip install yaas`. There's nothing extra to
+download. The ☰ menu's **GPU Acceleration...** entry shows whether Metal
+acceleration is available on your Mac.

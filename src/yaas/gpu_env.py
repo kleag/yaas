@@ -10,10 +10,16 @@ installer: it provisions a separate, self-contained Python environment
 and `yaas.worker.Worker` runs extraction there as a subprocess instead of
 in-process when it's ready.
 
-NVIDIA CUDA has no macOS equivalent, so this whole feature is Windows/Linux
-only; see `is_supported_platform()`.
+NVIDIA CUDA has no macOS equivalent, so this separate environment is
+Windows/Linux only; see `is_supported_platform()`. On Apple Silicon Macs no
+extra environment is needed at all: PyTorch only publishes one macOS arm64
+build, so even the "CPU-only" torch bundled into the dmg supports Apple's
+Metal (MPS) backend, and the bundled onnxruntime ships CoreML support.
+`audio_separator` picks both up automatically, and `separate_worker` does
+the same for OpenUnmix; see `is_apple_silicon()` / `mps_available()`.
 """
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -39,6 +45,20 @@ GPU_PACKAGES = [
 def is_supported_platform():
     """NVIDIA CUDA doesn't exist on macOS; this feature is Windows/Linux only."""
     return sys.platform != "darwin"
+
+
+def is_apple_silicon():
+    return sys.platform == "darwin" and platform.machine() == "arm64"
+
+
+def mps_available():
+    """Whether the in-process (bundled) torch can use Apple's Metal (MPS)
+    GPU backend. Needs no separate environment, unlike CUDA above."""
+    try:
+        import torch
+    except ImportError:
+        return False
+    return torch.backends.mps.is_available()
 
 
 def env_python(env_dir):

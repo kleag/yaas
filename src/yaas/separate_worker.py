@@ -38,6 +38,17 @@ MODEL_MAP = {
 }
 
 
+def _torch_device():
+    """Best available torch device. Unlike audio_separator, OpenUnmix doesn't
+    pick one itself: openunmix.predict.separate() runs on CPU unless told
+    otherwise, even with a CUDA GPU or on an Apple Silicon Mac (MPS)."""
+    if torch.cuda.is_available():
+        return "cuda"
+    if torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
+
+
 def extract_with_openunmix(flac_path, out_dir, status_cb, progress_cb):
     status_cb(f"Extracting tracks from flac {flac_path} with OpenUnmix...")
     model = openunmix.umxl()  # noqa: F841 (loaded for its side effect of caching weights)
@@ -46,7 +57,17 @@ def extract_with_openunmix(flac_path, out_dir, status_cb, progress_cb):
     waveform = waveform.mean(dim=0, keepdim=True)  # Convert to mono
     status_cb(f"Loaded audio at: {sample_rate}MHz")
 
-    estimates = separate(waveform, rate=44100)
+    device = _torch_device()
+    status_cb(f"Running OpenUnmix on {device}")
+    try:
+        estimates = separate(waveform, rate=44100, device=device)
+    except (RuntimeError, NotImplementedError) as ex:
+        # MPS in particular doesn't implement every op OpenUnmix's STFT and
+        # Wiener filtering use, and GPU memory can run out on long tracks.
+        if device == "cpu":
+            raise
+        status_cb(f"OpenUnmix failed on {device} ({ex}); retrying on CPU...")
+        estimates = separate(waveform, rate=44100, device="cpu")
 
     for source, estimate in estimates.items():
         file_name = os.path.splitext(os.path.basename(flac_path))[0]

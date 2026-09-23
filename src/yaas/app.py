@@ -3,6 +3,26 @@ import os
 import subprocess
 import sys
 
+
+def _add_macos_package_manager_paths():
+    """macOS apps launched from Finder/the Dock (like the dmg's yaas.app)
+    don't inherit the user's shell PATH: they get only
+    /usr/bin:/bin:/usr/sbin:/sbin, so an ffmpeg installed with Homebrew or
+    MacPorts is never found even though it works in a terminal. Add their
+    standard bin directories. This must run before pydub is imported (via
+    .worker below), since pydub looks ffmpeg up once at import time."""
+    if sys.platform != "darwin":
+        return
+    path = os.environ.get("PATH", "").split(os.pathsep)
+    extra = [d for d in ("/opt/homebrew/bin",  # Homebrew, Apple Silicon
+                         "/usr/local/bin",     # Homebrew, Intel
+                         "/opt/local/bin")     # MacPorts
+             if os.path.isdir(d) and d not in path]
+    os.environ["PATH"] = os.pathsep.join(extra + path)
+
+
+_add_macos_package_manager_paths()
+
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QHBoxLayout, QLabel, QLineEdit, QPushButton,
                                QTextEdit, QMessageBox, QSizePolicy,
@@ -141,6 +161,8 @@ class MainWindow(QWidget):
         self.main_menu.addAction("Report an Issue", self.open_issues)
         if gpu_env.is_supported_platform():
             self.main_menu.addAction("GPU Acceleration...", self.open_gpu_dialog)
+        elif gpu_env.is_apple_silicon():
+            self.main_menu.addAction("GPU Acceleration...", self.open_mps_dialog)
         self.main_menu.addSeparator()
         self.main_menu.addAction("About Yaas", self.show_about)
         self.menu_button.setMenu(self.main_menu)
@@ -264,6 +286,19 @@ class MainWindow(QWidget):
         elif remove_button is not None and clicked == remove_button:
             gpu_env.uninstall(self.gpu_env_dir)
             self.update_status("GPU acceleration environment removed.")
+
+    def open_mps_dialog(self):
+        if gpu_env.mps_available():
+            status_text = ("Available: extraction automatically uses this "
+                           "Mac's GPU through Apple's Metal (MPS) backend.")
+        else:
+            status_text = ("Not available: Metal (MPS) couldn't be initialized "
+                           "on this Mac, so extraction runs on CPU.")
+        QMessageBox.information(
+            self, "GPU Acceleration",
+            f"GPU acceleration status: {status_text}\n\n"
+            "On Apple Silicon Macs, GPU support is built into Yaas: there is "
+            "nothing extra to install.")
 
     def confirm_and_install_gpu_env(self):
         confirm = QMessageBox.question(
