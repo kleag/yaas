@@ -14,8 +14,8 @@ import logging
 import os
 import sys
 
+import soundfile
 import torch
-import torchaudio
 import openunmix
 from openunmix.predict import separate
 
@@ -69,7 +69,12 @@ def extract_with_openunmix(flac_path, out_dir, status_cb, progress_cb):
     status_cb(f"Extracting tracks from flac {flac_path} with OpenUnmix...")
     model = openunmix.umxl()  # noqa: F841 (loaded for its side effect of caching weights)
 
-    waveform, sample_rate = torchaudio.load(flac_path)
+    # soundfile rather than torchaudio.load/save: recent torchaudio routes
+    # both through torchcodec, which needs FFmpeg's *shared libraries* at
+    # runtime. The packaged apps don't have them (the macOS app only bundles
+    # the ffmpeg program), whereas soundfile's libsndfile is bundled.
+    data, sample_rate = soundfile.read(flac_path, dtype="float32", always_2d=True)
+    waveform = torch.from_numpy(data.T)  # (channels, frames), as torchaudio did
     waveform = waveform.mean(dim=0, keepdim=True)  # Convert to mono
     status_cb(f"Loaded audio at: {sample_rate}MHz")
 
@@ -89,11 +94,9 @@ def extract_with_openunmix(flac_path, out_dir, status_cb, progress_cb):
         file_name = os.path.splitext(os.path.basename(flac_path))[0]
         wav_path = os.path.join(out_dir, f"{file_name}_{source}.wav")
         status_cb(f'Writing result to {wav_path}')
-        torchaudio.save(
-            wav_path,
-            torch.squeeze(estimate).to("cpu"),
-            sample_rate=sample_rate,
-        )
+        # soundfile wants (frames, channels); .T is a no-op on mono.
+        soundfile.write(wav_path, torch.squeeze(estimate).to("cpu").numpy().T,
+                        sample_rate)
         status_cb(f'Wrote {source} to {wav_path}')
 
 

@@ -185,6 +185,20 @@ jobs:
       - name: Build executable with pyinstaller
         run: pyinstaller yaas.spec
 
+      - name: Install the desktop libraries the app expects from the system
+        # PyInstaller deliberately doesn't bundle graphics/windowing system
+        # libraries (every desktop has them, and they must match the local
+        # drivers), but the headless runner lacks them, so Qt can't even be
+        # imported ("libEGL.so.1: cannot open shared object file"). This is
+        # the full list of system libraries the frozen app's Qt links to and
+        # doesn't bundle (from ldd over the build's binaries), by package.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libdrm2 libegl1 libgl1 libglvnd0 libglx0 \
+            libwayland-client0 libwayland-cursor0 libwayland-egl1 libwayland-server0 \
+            libxcb1 libxcb-dri3-0 libxkbcommon0 libxkbcommon-x11-0
+
       - name: Self-test the frozen app
         # See src/yaas/self_test.py.
         run: dist/yaas --self-test selftest.txt

@@ -51,6 +51,23 @@ def _check_separator_init():
                                   model_file_dir=tmp)
 
 
+def _check_bundled_libsndfile():
+    # The obsolete PySoundFile package installs a soundfile.py of its own
+    # that only looks for a system-wide libsndfile. A Linux desktop usually
+    # has one, masking the problem, but a Mac never does, and audio_separator
+    # then fails to import. The current soundfile package sets _full_path to
+    # its packaged library and only sets _libname when it falls back to a
+    # system one.
+    import soundfile
+    path = getattr(soundfile, "_full_path", None)
+    if not path or hasattr(soundfile, "_libname"):
+        raise RuntimeError(
+            f"soundfile ({soundfile.__file__}) isn't using its packaged "
+            f"libsndfile (_soundfile_data), but "
+            f"{getattr(soundfile, '_libname', 'a system-wide one')}")
+    return path
+
+
 def _check_tool(name):
     def check():
         path = shutil.which(name)
@@ -64,15 +81,16 @@ def _check_https():
     urllib.request.urlopen("https://www.youtube.com", timeout=30).close()
 
 
-def _check_torchaudio_roundtrip():
-    # OpenUnmix backend: recent torchaudio load/save go through torchcodec,
-    # which needs FFmpeg's shared libraries, not just the ffmpeg program.
-    import torch
-    import torchaudio
+def _check_soundfile_roundtrip():
+    # The OpenUnmix backend reads the FLAC input and writes WAV stems with
+    # soundfile (see separate_worker.extract_with_openunmix).
+    import numpy
+    import soundfile
     with tempfile.TemporaryDirectory() as tmp:
-        path = os.path.join(tmp, "roundtrip.wav")
-        torchaudio.save(path, torch.zeros(1, 4410), sample_rate=44100)
-        torchaudio.load(path)
+        for ext in ("flac", "wav"):
+            path = os.path.join(tmp, f"roundtrip.{ext}")
+            soundfile.write(path, numpy.zeros((4410, 2), dtype="float32"), 44100)
+            soundfile.read(path)
 
 
 def run(report_path=None):
@@ -80,6 +98,7 @@ def run(report_path=None):
     # AppImage still rely on a system-wide install, so there it's a warning.
     ffmpeg_required = sys.platform == "darwin"
     checks = [
+        ("soundfile uses its bundled libsndfile", _check_bundled_libsndfile, True),
         ("audio_separator import", _check_audio_separator_import, True),
         ("audio_separator architectures", _check_audio_separator_architectures, True),
         ("ffmpeg on PATH", _check_tool("ffmpeg"), ffmpeg_required),
@@ -89,7 +108,7 @@ def run(report_path=None):
         ("audio_separator Separator()", _check_separator_init,
          ffmpeg_required or bool(shutil.which("ffmpeg"))),
         ("HTTPS certificate verification", _check_https, True),
-        ("torchaudio save/load (OpenUnmix)", _check_torchaudio_roundtrip, False),
+        ("soundfile FLAC/WAV round trip (OpenUnmix)", _check_soundfile_roundtrip, True),
     ]
     lines = [f"Yaas {__version__} self-test ({sys.platform}, "
              f"frozen={getattr(sys, 'frozen', False)})"]

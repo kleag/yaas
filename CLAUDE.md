@@ -35,6 +35,12 @@ flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statist
 
 There is no test suite in this repo (pytest is installed in CI but no tests exist yet; the "Test with pytest" CI step is commented out).
 
+Packaged builds have a headless smoke test, `yaas --self-test [REPORT_FILE]` (`src/yaas/self_test.py`), which `release.yml` runs on each freshly built installer. Verify packaging fixes with it on a build from a clean venv (not the dev `.venv`):
+```bash
+uv venv --python 3.12 --seed /tmp/x && uv pip install --python /tmp/x/bin/python . pyinstaller
+/tmp/x/bin/pyinstaller yaas.spec && dist/yaas --self-test
+```
+
 ### Build / release
 
 Versioning is managed by `bumpver`, which keeps `pyproject.toml`, `src/yaas/__init__.py`, `README.md`, and `inno_setup_script.iss` in sync (see `[tool.bumpver]` in `pyproject.toml`). Standard release flow (also documented in README.md):
@@ -60,7 +66,7 @@ Two packages under `src/`:
 - **`yaas/`** — the actual GUI application (the entry point declared in `pyproject.toml`'s `[project.scripts]`).
   - `app.py` — `MainWindow` (a `QWidget`): embeds the `QWebEngineView` browser, parses CLI args (`--out`, `--backend`, `--model`), and wires the Start/Stop buttons to a `Worker` thread. `main()` sets Qt platform env vars (forces `xcb` on Linux to avoid Wayland/Chromium bugs) before creating the `QApplication`.
   - `worker.py` — `Worker(QThread)`: runs the whole download→convert→separate pipeline off the UI thread and reports progress via Qt signals (`update_status`, `extraction_done`, `extraction_failed`). `extract_tracks()` dispatches to one of two private methods based on `self.backend_type`:
-    - `_extract_with_openunmix` — loads `openunmix.umxl()`, runs `openunmix.predict.separate`, writes one WAV per source with `torchaudio.save`.
+    - `_extract_with_openunmix` — loads `openunmix.umxl()`, runs `openunmix.predict.separate`, reads/writes audio with `soundfile` (not torchaudio, whose load/save need FFmpeg shared libraries via torchcodec, absent from the packaged apps).
     - `_extract_with_audio_separator` — uses `audio_separator.separator.Separator`; `model_type` (`roformer`/`htdemucs6s`) maps to a checkpoint filename in `model_map`. This import is wrapped in `try/except ImportError` (`HAS_AUDIO_SEPARATOR`) since `audio_separator` is an optional/heavier dependency.
   - `__main__.py` — lets the package run as `python -m yaas`.
 
