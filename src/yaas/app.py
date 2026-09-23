@@ -511,6 +511,13 @@ class MainWindow(QWidget):
 
 
 def main():
+    if "--self-test" in sys.argv:
+        # Headless packaging smoke test, run by release.yml on each built
+        # installer; see self_test.py.
+        from . import self_test
+        i = sys.argv.index("--self-test")
+        report = sys.argv[i + 1] if len(sys.argv) > i + 1 else None
+        sys.exit(self_test.run(report))
     # 1. Platform-Specific Fixes
     if sys.platform.startswith("linux"):
         # Only force X11/xcb on Linux to bypassWayland Chromium bugs

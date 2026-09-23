@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - '*.*.*'
+  # Manual runs (Actions tab -> Run workflow) build and self-test all three
+  # installers, downloadable as workflow artifacts, without tagging a
+  # version or publishing a release.
+  workflow_dispatch:
 
 jobs:
   build-windows:
@@ -45,6 +49,14 @@ jobs:
 
       - name: Build executable with pyinstaller
         run: pyinstaller yaas.spec
+
+      - name: Self-test the frozen app
+        # See src/yaas/self_test.py. The windowed exe has no console, so
+        # wait for it explicitly and read its report file.
+        run: |
+          $p = Start-Process -FilePath dist\yaas.exe -ArgumentList '--self-test','selftest.txt' -Wait -PassThru
+          Get-Content selftest.txt
+          exit $p.ExitCode
 
       - name: Build Installer
         run: |
@@ -117,6 +129,11 @@ jobs:
       - name: Build app bundle with pyinstaller
         run: pyinstaller yaas.spec
 
+      - name: Self-test the frozen app
+        # See src/yaas/self_test.py. Runs with the minimal environment a
+        # Finder/Dock launch gets (no shell PATH, no Homebrew), like users.
+        run: env -i HOME="$HOME" TMPDIR="$TMPDIR" PATH=/usr/bin:/bin:/usr/sbin:/sbin dist/yaas.app/Contents/MacOS/yaas --self-test selftest.txt
+
       - name: Build DMG
         run: |
           hdiutil create -volname Yaas -srcfolder dist/yaas.app -ov -format UDZO yaas_installer.dmg
@@ -168,6 +185,10 @@ jobs:
       - name: Build executable with pyinstaller
         run: pyinstaller yaas.spec
 
+      - name: Self-test the frozen app
+        # See src/yaas/self_test.py.
+        run: dist/yaas --self-test selftest.txt
+
       - name: Assemble AppDir
         run: |
           set -e
@@ -208,7 +229,7 @@ jobs:
 
   release:
     needs: [build-windows, build-macos, build-linux-appimage]
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write

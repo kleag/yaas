@@ -8,8 +8,8 @@ from yturl2mp3.config import Config
 from yturl2mp3.helpers import (convert_mp4_to_mp3, download_mp3,
                                is_valid_playlist_url, is_valid_video_url)
 from . import gpu_env
-from .separate_worker import (HAS_AUDIO_SEPARATOR, extract_with_audio_separator,
-                              extract_with_openunmix)
+from .separate_worker import (HAS_AUDIO_SEPARATOR, audio_separator_unavailable_message,
+                              extract_with_audio_separator, extract_with_openunmix)
 
 
 class Worker(QThread):
@@ -135,9 +135,7 @@ class Worker(QThread):
                     model_dir=self.models_dir)
             elif self.backend_type == "audio_separator":
                 if not HAS_AUDIO_SEPARATOR:
-                    self.extraction_failed.emit(
-                        "audio_separator library not installed. Please install "
-                        "it with 'pip install \"audio_separator[cpu]\"'")
+                    self.extraction_failed.emit(audio_separator_unavailable_message())
                     return
                 extract_with_audio_separator(
                     flac_path, self.out, self.model_type,

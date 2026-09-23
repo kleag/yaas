@@ -19,6 +19,10 @@ import torchaudio
 import openunmix
 from openunmix.predict import separate
 
+# Full traceback of a failed audio_separator import, or None. Surfaced in
+# the app's status log and by `yaas --self-test`: stderr alone is invisible
+# in a packaged app launched from Finder/Explorer/a desktop launcher.
+AUDIO_SEPARATOR_IMPORT_ERROR = None
 try:
     from audio_separator.separator import Separator
     HAS_AUDIO_SEPARATOR = True
@@ -29,8 +33,20 @@ except Exception:
     # installed" -- that message previously hid two separate packaging bugs
     # (missing soundfile/nodejs_wheel files) behind a generic message.
     import traceback
-    traceback.print_exc(file=sys.stderr)
+    AUDIO_SEPARATOR_IMPORT_ERROR = traceback.format_exc()
+    print(AUDIO_SEPARATOR_IMPORT_ERROR, file=sys.stderr)
     HAS_AUDIO_SEPARATOR = False
+
+
+def audio_separator_unavailable_message():
+    """User-facing explanation of why audio_separator can't be used, ending
+    with the actual exception rather than just "not installed"."""
+    cause = (AUDIO_SEPARATOR_IMPORT_ERROR or "").strip().splitlines()
+    return ("audio_separator could not be loaded"
+            + (f": {cause[-1]}" if cause else "")
+            + ". If you installed Yaas with pip, install it with "
+            "'pip install \"audio_separator[cpu]\"'; otherwise please report "
+            "this error.")
 
 MODEL_MAP = {
     "roformer": "BS-Roformer-SW.ckpt",
@@ -85,9 +101,7 @@ def extract_with_audio_separator(flac_path, out_dir, model_type, status_cb, prog
                                  model_dir=None):
     status_cb(f"Extracting tracks from flac {flac_path} with {model_type}...")
     if not HAS_AUDIO_SEPARATOR:
-        raise RuntimeError(
-            "audio_separator library not installed. "
-            "Please install it with 'pip install \"audio_separator[cpu]\"'")
+        raise RuntimeError(audio_separator_unavailable_message())
 
     separator_kwargs = {
         "log_level": logging.INFO,

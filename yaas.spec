@@ -28,6 +28,24 @@ for _ffmpeg_tool in ('ffmpeg', 'ffprobe'):
     if os.path.exists(_ffmpeg_tool_path):
         _bundled_binaries.append((_ffmpeg_tool_path, 'bundled_ffmpeg'))
 
+# torchvision and torchcodec load their native libraries by *file* lookup
+# in their own package directory (importlib's FileFinder, then
+# torch.ops.load_library), never by import, so PyInstaller never collects
+# them: torchvision's hook still asks for the pre-"_stable" names
+# ("Hidden import torchvision._C not found!"), torchcodec has no hook at
+# all, and collect_dynamic_libs() skips them since they carry Python
+# extension suffixes. Without them, torchvision's import fails ("operator
+# torchvision::nms does not exist"), which breaks audio_separator's MDX
+# architecture, and torchaudio load/save fail ("No spec found for
+# libtorchcodec_image"), which breaks the OpenUnmix backend. Both found by
+# `yaas --self-test`.
+from PyInstaller.utils.hooks import get_package_paths as _get_package_paths
+import glob as _glob
+for _pkg in ('torchvision', 'torchcodec'):
+    _pkg_dir = _get_package_paths(_pkg)[1]
+    for _pattern in ('*.so', '*.dylib', '*.dll', '*.pyd'):
+        _bundled_binaries += [(_lib, _pkg) for _lib in _glob.glob(os.path.join(_pkg_dir, _pattern))]
+
 # pytubefix (>=recent versions, see JuanBindez/pytubefix#209) shells out to a
 # Node.js binary to run YouTube's signature/PoToken-deciphering JS, via the
 # nodejs_wheel package. PyInstaller's static import scanner only bundles
