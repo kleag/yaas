@@ -5,7 +5,7 @@
 
 # Yet Another Audio Splitter
 
-This is Yaas 0.11.6, a tool to split video soundtracks into separate tracks
+This is Yaas 0.11.7, a tool to split video soundtracks into separate tracks
 using OpenUnmix.
 
 Full documentation: **https://kleag.github.io/yaas/**
