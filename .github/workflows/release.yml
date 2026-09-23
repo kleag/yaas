@@ -81,6 +81,30 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v3
 
+      - name: Bundle static ffmpeg/ffprobe binaries
+        # A Finder-launched .app can't rely on a user-installed ffmpeg (it
+        # doesn't inherit the shell PATH, and most users won't have Homebrew
+        # anyway), so ship arm64 static builds inside the app; yaas.spec
+        # picks them up from ./bundled_ffmpeg/ and yaas.app puts them on
+        # PATH at startup. Pinned to an exact build and checked against its
+        # published SHA-256 (the site's "latest" redirect is unreliable).
+        # These are GPL builds: bundled as separate, unmodified executables.
+        env:
+          FFMPEG_BASE_URL: https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2
+          FFMPEG_SHA256: c8ed4c4e6978a03c485edbfe4e0a5dc2380f8a30bba5150531b31b094492d924
+          FFPROBE_SHA256: fcbe839537485eaee7a7a8bc5cbc0f90d53617e80943e8a5b2e31cb851197ea6
+        run: |
+          set -e
+          mkdir -p bundled_ffmpeg
+          curl -sfL -o ffmpeg.zip "$FFMPEG_BASE_URL/ffmpeg.zip"
+          curl -sfL -o ffprobe.zip "$FFMPEG_BASE_URL/ffprobe.zip"
+          echo "$FFMPEG_SHA256  ffmpeg.zip" | shasum -a 256 -c -
+          echo "$FFPROBE_SHA256  ffprobe.zip" | shasum -a 256 -c -
+          unzip -o ffmpeg.zip -d bundled_ffmpeg
+          unzip -o ffprobe.zip -d bundled_ffmpeg
+          chmod +x bundled_ffmpeg/ffmpeg bundled_ffmpeg/ffprobe
+          bundled_ffmpeg/ffmpeg -version | head -1
+
       - name: Install dependencies
         # Installs the CPU-only build of torch (see [tool.uv.sources] in
         # pyproject.toml): the CUDA-enabled default PyPI build alone pushes

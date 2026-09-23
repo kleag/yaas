@@ -4,24 +4,31 @@ import subprocess
 import sys
 
 
-def _add_macos_package_manager_paths():
-    """macOS apps launched from Finder/the Dock (like the dmg's yaas.app)
+def _setup_ffmpeg_path():
+    """Make ffmpeg/ffprobe findable by plain name, as pydub, audio_separator
+    and check_ffmpeg() all look them up on PATH. This must run before pydub
+    is imported (via .worker below), since pydub looks ffmpeg up once at
+    import time.
+
+    The macOS dmg ships static builds in bundled_ffmpeg/ (see yaas.spec);
+    those come first. Beyond that, macOS apps launched from Finder/the Dock
     don't inherit the user's shell PATH: they get only
     /usr/bin:/bin:/usr/sbin:/sbin, so an ffmpeg installed with Homebrew or
-    MacPorts is never found even though it works in a terminal. Add their
-    standard bin directories. This must run before pydub is imported (via
-    .worker below), since pydub looks ffmpeg up once at import time."""
-    if sys.platform != "darwin":
-        return
+    MacPorts would never be found even though it works in a terminal. Add
+    their standard bin directories too, as a fallback."""
     path = os.environ.get("PATH", "").split(os.pathsep)
-    extra = [d for d in ("/opt/homebrew/bin",  # Homebrew, Apple Silicon
-                         "/usr/local/bin",     # Homebrew, Intel
-                         "/opt/local/bin")     # MacPorts
-             if os.path.isdir(d) and d not in path]
+    extra = []
+    if getattr(sys, "frozen", False):
+        extra.append(os.path.join(sys._MEIPASS, "bundled_ffmpeg"))
+    if sys.platform == "darwin":
+        extra += ["/opt/homebrew/bin",  # Homebrew, Apple Silicon
+                  "/usr/local/bin",     # Homebrew, Intel
+                  "/opt/local/bin"]     # MacPorts
+    extra = [d for d in extra if os.path.isdir(d) and d not in path]
     os.environ["PATH"] = os.pathsep.join(extra + path)
 
 
-_add_macos_package_manager_paths()
+_setup_ffmpeg_path()
 
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QHBoxLayout, QLabel, QLineEdit, QPushButton,

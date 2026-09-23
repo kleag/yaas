@@ -32,11 +32,10 @@ drag Yaas into `/Applications`.
     time you open it. Right-click the app and choose **Open** (instead of
     double-clicking) to bypass that warning once.
 
-You also need ffmpeg, e.g. via [Homebrew](https://brew.sh/):
-
-```bash
-brew install ffmpeg
-```
+ffmpeg is included in the app: there's nothing else to install. (These are
+the static [FFmpeg](https://ffmpeg.org/) builds by
+[Martin Riedl](https://ffmpeg.martin-riedl.de/), licensed under the GPL and
+shipped as separate, unmodified programs.)
 
 ## Linux: using the AppImage
 

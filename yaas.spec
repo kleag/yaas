@@ -18,6 +18,16 @@ _uv_binary_name = 'uv.exe' if sys.platform == 'win32' else 'uv'
 _uv_binary_path = os.path.join('bundled_uv', _uv_binary_name)
 _bundled_binaries = [(_uv_binary_path, '.')] if os.path.exists(_uv_binary_path) else []
 
+# Static ffmpeg/ffprobe builds, downloaded into ./bundled_ffmpeg/ by
+# release.yml's macOS job (a double-clicked .app can't see a Homebrew
+# ffmpeg). Kept in their own bundled_ffmpeg/ subdirectory, which
+# yaas.app puts first on PATH at startup, so pydub, audio_separator and
+# the startup check all find them by plain name. Optional, like uv above.
+for _ffmpeg_tool in ('ffmpeg', 'ffprobe'):
+    _ffmpeg_tool_path = os.path.join('bundled_ffmpeg', _ffmpeg_tool)
+    if os.path.exists(_ffmpeg_tool_path):
+        _bundled_binaries.append((_ffmpeg_tool_path, 'bundled_ffmpeg'))
+
 # pytubefix (>=recent versions, see JuanBindez/pytubefix#209) shells out to a
 # Node.js binary to run YouTube's signature/PoToken-deciphering JS, via the
 # nodejs_wheel package. PyInstaller's static import scanner only bundles
