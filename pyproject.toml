@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "yaas"
-version = "0.11.7"
+version = "0.12.0"
 description = "Desktop app splitting YouTube video soundtracks into separate stems (vocals, drums, bass, ...) with audio-separator or OpenUnmix"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -67,7 +67,7 @@ yaas = ["resources/*.png", "resources/*.ico", "resources/*.icns", "resources/*.s
 
 
 [tool.bumpver]
-current_version = "0.11.7"
+current_version = "0.12.0"
 version_pattern = "MAJOR.MINOR.PATCH"
 commit_message = "Bump version {old_version} -> {new_version}"
 tag_message = "{new_version}"
