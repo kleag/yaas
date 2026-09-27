@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "yaas"
 version = "0.11.7"
-description = "A tool to split video soundtracks into separate tracks using OpenUnmix (with optional audio-separator backend support)"
+description = "Desktop app splitting YouTube video soundtracks into separate stems (vocals, drums, bass, ...) with audio-separator or OpenUnmix"
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [

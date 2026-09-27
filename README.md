@@ -1,12 +1,17 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.png">
-  <img alt="Yaas" src="docs/assets/logo-light.png" width="300">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/kleag/yaas/main/docs/assets/logo-dark.png">
+  <img alt="Yaas" src="https://raw.githubusercontent.com/kleag/yaas/main/docs/assets/logo-light.png" width="300">
 </picture>
 
 # Yet Another Audio Splitter
 
-This is Yaas 0.11.7, a tool to split video soundtracks into separate tracks
-using OpenUnmix.
+This is Yaas 0.11.7, a desktop application that splits the soundtrack of a
+YouTube video into separate stems (vocals, drums, bass, other, ...), for
+example to practice an instrument over the rest of the band.
+
+Browse to a video in the built-in browser, click **Start**, and Yaas
+downloads its audio, separates it with a machine-learning model, and writes
+one WAV file per stem.
 
 Full documentation: **https://kleag.github.io/yaas/**
 
@@ -14,101 +19,103 @@ Full documentation: **https://kleag.github.io/yaas/**
 
 ## Installation
 
-### Using the installer
+Ready-to-run builds are on the
+[GitHub Releases page](https://github.com/kleag/yaas/releases):
 
-If you are under Windows and don't know how to use uv and pip (see below), you can use the latest `yaas_installer.exe` in https://github.com/kleag/yaas/releases
+| Platform | Download | ffmpeg |
+| --- | --- | --- |
+| Windows | `yaas_installer.exe` | Install it separately: `winget install ffmpeg` in PowerShell |
+| macOS (Apple Silicon) | `yaas_installer.dmg` | Included |
+| Linux (x86_64) | `yaas-x86_64.AppImage` | Install it with your package manager, e.g. `sudo apt install ffmpeg` |
 
-You must also install ffmpeg. It seems that the simplest way to do so under Windows is with winget (winget is installed by default on Windows 11, and can be installed using the Windows Store on previous versions).
+The macOS app isn't signed: the first time, right-click it and choose
+**Open** to get past Gatekeeper's warning. On an Intel Mac, install from
+PyPI instead.
 
-To install ffmpeg with winget, start PowerShell, and then run:
-
-```
-winget install ffmpeg
-```
-
-### Using uv
-
-Create and activate a virtual environment. For information on uv, see https://docs.astral.sh/uv/getting-started/.
-
-Then install yaas in your environment:
+On any platform with Python 3.12 to 3.14, you can also install from PyPI into
+a virtual environment (see the [uv documentation](https://docs.astral.sh/uv/getting-started/)),
+with ffmpeg installed separately:
 
 ```bash
 uv pip install yaas
 ```
 
-If you are under Windows, you will have to ensure to have a working python installation and to have ffmpeg installed.
+See [Installation](https://kleag.github.io/yaas/installation/) for details,
+including GPU acceleration.
 
 ## Usage
 
-### Starting the application
+Start Yaas from your applications menu, or with `yaas` in a terminal when
+installed from PyPI. Then:
 
-#### When installed with the Windows installer
+1. navigate to a YouTube video in the integrated browser,
+2. click **Start** and wait: separation can take a while, especially on CPU,
+3. find the stems in the output folder, `$HOME/yaas_tracks` by default.
 
-Search yaas in your installed applications and start it.
+Click **Stop** to interrupt an extraction.
 
-#### When installed with uv
+The ☰ menu gives access to:
 
-Activate your virtual environment and then just run:
+- **Settings...**: the output folder and the separation model,
+- **GPU Acceleration...**: an optional CUDA environment on Windows/Linux, or
+  the status of Metal acceleration on Apple Silicon Macs,
+- the documentation, the issue tracker, and the version information.
 
-```
+### Separation models
+
+Choose the model in **Settings...**; the choice is kept for future runs.
+
+| Model | Library | Notes |
+| --- | --- | --- |
+| BS-Roformer (default) | [audio-separator](https://github.com/nomadkaraoke/python-audio-separator) | |
+| HTDemucs 6 stems | [audio-separator](https://github.com/nomadkaraoke/python-audio-separator) | Also separates guitar and piano |
+| OpenUnmix | [OpenUnmix](https://github.com/sigsep/open-unmix-pytorch) | |
+
+Models are downloaded on first use and cached for later runs.
+
+### Command-line options
+
+These override the settings for a single run:
+
+| Option | Description |
+| --- | --- |
+| `-o`, `--out DIR` | Output folder |
+| `--backend {audio_separator,openunmix}` | Separation library |
+| `--model {roformer,htdemucs6s}` | Model used with the `audio_separator` backend |
+
+Please respect the copyright of the videos' authors: if they don't allow
+sharing, keep the extracted stems for your personal use.
+
+## Development
+
+Yaas uses [uv](https://docs.astral.sh/uv/). From a clone of the repository:
+
+```bash
+uv venv && source .venv/bin/activate
+uv pip install -e .
 yaas
 ```
 
-### Using Yaas
-
-Search the video from which you want to extract the sound tracks using the
-integrated browser, click the Start button, wait (it can be long), and then use
-the generated audio files. Those are put by default in `$HOME/yaas_tracks`; change
-the destination folder any time from the ☰ menu's **Settings...** entry, or
-override it for a single run with the `--out` option.
-
-If you want to interrupt an extraction, just click the `Stop` button that
-replaces the `Start` button during work.
-
-Note that you must respect the copyright of the authors. E.g., If they don't
-authorize sharing, you must keep your private copy for you.
-
-### Backend Options
-
-Yaas supports multiple track separation backends:
-
-1. **OpenUnmix** (default): Uses the OpenUnmix model for track separation
-2. **Audio Separator**: Uses the audio-separator library with ht-demucs model
-
-To use the audio-separator backend, install it first:
-```bash
-pip install "audio_separator[cpu]"
-```
-
-Then run Yaas with:
-```bash
-yaas --backend audio_separator
-```
-
-## Building and distributing
+Releases are versioned with [bumpver](https://github.com/mbarkhau/bumpver):
 
 ```bash
 git commit
-bumpver update --patch
+bumpver update --patch   # or --minor / --major
 uv build
 uv publish
 ```
 
-### Under Windows
+Pushing the resulting version tag makes GitHub Actions build the Windows,
+macOS, and Linux packages and attach them to a GitHub Release. See
+[Building & Releasing](https://kleag.github.io/yaas/building/) for building
+them locally.
 
-```
-pyinstaller .\yaas.spec
- & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' .\inno_setup_script.iss
-```
-
-## Author
+## Author and license
 
 Gaël de Chalendar, aka Kleag
 (c) Gaël de Chalendar, 2024-2026
 
 This program is free software, licensed under the Mozilla Public License 2.0
 (MPL 2.0) license (see the LICENSE file). It includes most of the
-youtube-to-mp3 project (https://github.com/cedricouellet/youtube-to-mp3),
+[youtube-to-mp3](https://github.com/cedricouellet/youtube-to-mp3) project,
 itself under the MPL license.
-
-

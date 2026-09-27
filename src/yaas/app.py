@@ -69,7 +69,8 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                                QHBoxLayout, QLabel, QLineEdit, QPushButton,
                                QTextEdit, QMessageBox, QSizePolicy,
                                QProgressBar, QToolButton, QMenu, QDialog,
-                               QFormLayout, QDialogButtonBox, QFileDialog)
+                               QFormLayout, QDialogButtonBox, QFileDialog,
+                               QComboBox)
 from PySide6.QtCore import (Qt, QStandardPaths, QThread, QUrl, Signal, Slot)
 from PySide6.QtGui import QDesktopServices, QIcon
 
@@ -147,6 +148,13 @@ class SettingsDialog(QDialog):
         self.output_dir_row.addWidget(self.browse_button)
         form.addRow("Output folder:", self.output_dir_row)
 
+        self.model_combo = QComboBox()
+        for key, (label, _backend, _model) in settings.MODELS.items():
+            self.model_combo.addItem(label, key)
+        self.model_combo.setCurrentIndex(
+            self.model_combo.findData(settings.get_model()))
+        form.addRow("Separation model:", self.model_combo)
+
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.save)
         buttons.rejected.connect(self.reject)
@@ -165,6 +173,7 @@ class SettingsDialog(QDialog):
 
     def save(self):
         settings.set_output_dir(self.output_dir)
+        settings.set_model(self.model_combo.currentData())
         self.accept()
 
 
@@ -175,6 +184,13 @@ class MainWindow(QWidget):
         self.args = self.parse_args()
         if not self.args.out:
             self.args.out = settings.get_output_dir()
+        # --backend/--model override the Settings dialog's model for this
+        # run only, like --out does for the output folder.
+        if self.args.backend is None and self.args.model is None:
+            self.apply_model_setting()
+        else:
+            self.args.backend = self.args.backend or "audio_separator"
+            self.args.model = self.args.model or "roformer"
 
         self.setWindowTitle("YouTube Audio Splitter")
         self.setWindowIcon(QIcon(icon_path()))
@@ -292,6 +308,13 @@ class MainWindow(QWidget):
         if dialog.exec() == QDialog.Accepted:
             self.args.out = settings.get_output_dir()
             self.update_status(f"Output folder set to {self.args.out}")
+            self.apply_model_setting()
+            label = settings.MODELS[settings.get_model()][0]
+            self.update_status(f"Separation model set to {label}")
+
+    def apply_model_setting(self):
+        _label, self.args.backend, self.args.model = settings.MODELS[
+            settings.get_model()]
 
     def open_documentation(self):
         QDesktopServices.openUrl(QUrl(DOCUMENTATION_URL))
@@ -395,15 +418,19 @@ class MainWindow(QWidget):
         
         parser.add_argument(
             '--backend', metavar="BACKEND", type=str,
-            default="audio_separator",
+            default=None,
             choices=["audio_separator", "openunmix"],
-            help="The backend to use for track separation (openunmix, audio_separator)")
+            help="The backend to use for track separation (openunmix, "
+                 "audio_separator). Overrides the Settings dialog's model "
+                 "for this run only; defaults to it if not given.")
         
         parser.add_argument(
             '--model', metavar="MODEL", type=str,
-            default="roformer",
+            default=None,
             choices=["roformer", "htdemucs6s"],
-            help="The model to use with audio_separator backend (roformer, htdemucs6s)")
+            help="The model to use with audio_separator backend (roformer, "
+                 "htdemucs6s). Overrides the Settings dialog's model for "
+                 "this run only; defaults to it if not given.")
 
         return parser.parse_known_args()[0]
 

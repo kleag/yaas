@@ -83,4 +83,4 @@ Two packages under `src/`:
 
 ### Backend/model selection
 
-CLI args parsed in `MainWindow.parse_args()`: `--backend {audio_separator, openunmix}` (default `audio_separator`) and `--model {roformer, htdemucs6s}` (default `roformer`, only meaningful for the `audio_separator` backend). These are read off `yaas.args` inside `Worker.__init__` via `getattr(..., default)`, so `Worker` degrades gracefully if args are ever missing.
+The model is chosen in the Settings dialog (a combo box over `settings.MODELS`, which maps each choice to a backend + model pair) and persisted in `yaas.conf`; `MainWindow.apply_model_setting()` copies it into `self.args.backend`/`self.args.model`. The CLI args `--backend {audio_separator, openunmix}` and `--model {roformer, htdemucs6s}` (default `None`) override it for one run only, like `--out`; if only one is given, the other falls back to `audio_separator`/`roformer`. These are read off `yaas.args` inside `Worker.__init__` via `getattr(..., default)`, so `Worker` degrades gracefully if args are ever missing.

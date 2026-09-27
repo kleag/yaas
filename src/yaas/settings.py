@@ -31,3 +31,25 @@ def set_output_dir(path):
     settings = _settings()
     settings.setValue(_KEY_OUTPUT_DIR, path)
     settings.sync()
+
+
+# Separation models offered in the Settings dialog, as
+# key -> (label, backend, audio_separator model). The key is what's stored.
+MODELS = {
+    "roformer": ("BS-Roformer", "audio_separator", "roformer"),
+    "htdemucs6s": ("HTDemucs 6 stems", "audio_separator", "htdemucs6s"),
+    "openunmix": ("OpenUnmix", "openunmix", "roformer"),
+}
+_KEY_MODEL = "model"
+_DEFAULT_MODEL = "roformer"
+
+
+def get_model():
+    model = _settings().value(_KEY_MODEL, _DEFAULT_MODEL)
+    return model if model in MODELS else _DEFAULT_MODEL
+
+
+def set_model(model):
+    settings = _settings()
+    settings.setValue(_KEY_MODEL, model)
+    settings.sync()

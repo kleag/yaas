@@ -40,7 +40,8 @@ If you want to interrupt an extraction, click **Stop**, which replaces
 The ☰ button to the right of the URL bar opens a menu with:
 
 - **Settings...** — set the output folder extracted stems are written to,
-  picked via your system's native folder picker.
+  picked via your system's native folder picker, and the separation model
+  (see below).
 - **Documentation** — opens this site in your browser.
 - **Report an Issue** — opens the GitHub issue tracker.
 - **GPU Acceleration...** — on Windows/Linux, install, reinstall, or
@@ -53,6 +54,10 @@ The ☰ button to the right of the URL bar opens a menu with:
 
 ## Choosing a separation backend
 
+Pick the separation model in **Settings...**: BS-Roformer (default),
+HTDemucs 6 stems, or OpenUnmix. The choice is saved for future runs. It can
+also be overridden for a single run from the command line.
+
 Yaas supports two backends for splitting the soundtrack into stems:
 
 1. **audio-separator** (default) — uses the
@@ -64,9 +69,6 @@ Yaas supports two backends for splitting the soundtrack into stems:
    [OpenUnmix](https://github.com/sigsep/open-unmix-pytorch) model.
 
 ```bash
-# Default backend and model
-yaas
-
 # audio-separator with a specific model
 yaas --backend audio_separator --model htdemucs6s
 
@@ -79,5 +81,5 @@ yaas --backend openunmix
 | Option | Default | Description |
 | --- | --- | --- |
 | `-o`, `--out DIR` | Settings dialog's output folder | Directory to store the output files in, for this run only. |
-| `--backend {audio_separator,openunmix}` | `audio_separator` | Track separation backend. |
-| `--model {roformer,htdemucs6s}` | `roformer` | Model used by the `audio_separator` backend. |
+| `--backend {audio_separator,openunmix}` | Settings dialog's model | Track separation backend, for this run only. |
+| `--model {roformer,htdemucs6s}` | Settings dialog's model | Model used by the `audio_separator` backend, for this run only. |
