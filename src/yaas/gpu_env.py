@@ -20,6 +20,7 @@ the same for OpenUnmix; see `is_apple_silicon()` / `mps_available()`.
 """
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -28,18 +29,15 @@ from . import __version__
 
 GPU_ENV_DIRNAME = "gpu-env"
 
-# torch/torchaudio/torchcodec/torchvision here are deliberately installed
-# from the default PyPI index (CUDA-capable), unlike the CPU-only pin used
-# for the frozen app's own build (see [tool.uv.sources] in pyproject.toml).
-# This is the one place that intentionally opts back into the CUDA wheels.
-GPU_PACKAGES = [
-    "torch",
-    "torchaudio",
-    "torchcodec",
-    "torchvision",
-    "openunmix",
-    "audio_separator[gpu]",
-]
+# torch/torchaudio/torchcodec/torchvision are installed from PyTorch's own
+# CUDA wheel index, unlike the CPU-only pin used for the frozen app's own
+# build (see [tool.uv.sources] in pyproject.toml). Not from PyPI: its
+# Windows torch wheels are CPU-only (only its Linux ones use CUDA).
+TORCH_PACKAGES = ["torch", "torchaudio", "torchcodec", "torchvision"]
+CUDA_INDEX_URL = "https://download.pytorch.org/whl/{variant}"
+# Installed from PyPI in a second step, which keeps the CUDA torch above as
+# it already satisfies their requirements.
+BACKEND_PACKAGES = ["openunmix", "audio_separator[gpu]"]
 
 
 def is_supported_platform():
@@ -120,6 +118,22 @@ def _run_streamed(cmd, status_cb):
         raise RuntimeError(f"Command failed (exit {proc.returncode}): {' '.join(cmd)}")
 
 
+def cuda_wheel_variant():
+    """The PyTorch CUDA build to install. cu126 runs on the widest range of
+    NVIDIA GPUs and drivers, but has no kernels for Blackwell GPUs (compute
+    capability 10 and up, e.g. RTX 50xx), which need CUDA 13 (cu130, driver
+    580+). CUDA 13 in turn dropped the GPUs before Turing, so it's only used
+    when nvidia-smi reports a Blackwell GPU."""
+    try:
+        out = subprocess.run(
+            ["nvidia-smi", "--query-gpu=compute_cap", "--format=csv,noheader"],
+            capture_output=True, text=True, timeout=30).stdout
+    except (OSError, subprocess.SubprocessError):
+        return "cu126"
+    caps = [float(c) for c in re.findall(r"\d+\.\d+", out)]
+    return "cu130" if caps and max(caps) >= 10 else "cu126"
+
+
 def check_cuda_available(env_dir):
     result = subprocess.run(
         [env_python(env_dir), "-c", "import torch; print(torch.cuda.is_available())"],
@@ -141,10 +155,16 @@ def install(env_dir, status_cb):
     status_cb("Creating an isolated Python environment for GPU acceleration...")
     _run_streamed([uv, "venv", env_dir, "--python", "3.12"], status_cb)
 
-    status_cb("Installing GPU-accelerated PyTorch and separation backends "
-              "(this downloads several GB, please be patient)...")
+    variant = cuda_wheel_variant()
+    status_cb(f"Installing GPU-accelerated PyTorch ({variant}; this downloads "
+              "several GB, please be patient)...")
     _run_streamed(
-        [uv, "pip", "install", "--python", env_python(env_dir), *GPU_PACKAGES],
+        [uv, "pip", "install", "--python", env_python(env_dir),
+         "--index-url", CUDA_INDEX_URL.format(variant=variant), *TORCH_PACKAGES],
+        status_cb)
+    status_cb("Installing the separation backends...")
+    _run_streamed(
+        [uv, "pip", "install", "--python", env_python(env_dir), *BACKEND_PACKAGES],
         status_cb)
 
     with open(_version_stamp_path(env_dir), "w") as f:
@@ -165,33 +185,48 @@ def uninstall(env_dir):
 
 
 def run_extraction(env_dir, flac_path, out_dir, backend, model, status_cb, progress_cb,
-                   model_dir=None):
+                   model_dir=None, on_start=None):
     """Runs separate_worker.py as a subprocess inside the GPU env, parsing
-    its stdout protocol (YAAS_STATUS/YAAS_PROGRESS/YAAS_ERROR/YAAS_DONE)
-    into the same status_cb/progress_cb callbacks the in-process path uses."""
-    cmd = [
-        env_python(env_dir), _separate_worker_script(),
-        flac_path, out_dir, "--backend", backend, "--model", model,
-    ]
+    its stdout protocol (YAAS_STATUS/YAAS_PROGRESS/YAAS_OUTPUT/YAAS_ERROR/
+    YAAS_DONE) into the same status_cb/progress_cb callbacks the in-process
+    path uses. on_start, if given, receives the Popen object, so the caller
+    can kill it to cancel the extraction. Returns the written stems' paths."""
+    cmd = [env_python(env_dir), _separate_worker_script(),
+           flac_path, out_dir, "--backend", backend]
+    if model:
+        cmd += ["--model", model]
     if model_dir:
         cmd += ["--model-dir", model_dir]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, bufsize=1)
+    if on_start is not None:
+        on_start(proc)
     error_message = None
-    for line in proc.stdout:
-        line = line.rstrip("\n")
-        if line.startswith("YAAS_STATUS "):
-            status_cb(line[len("YAAS_STATUS "):])
-        elif line.startswith("YAAS_PROGRESS "):
-            progress_cb(int(line[len("YAAS_PROGRESS "):]))
-        elif line.startswith("YAAS_ERROR "):
-            error_message = line[len("YAAS_ERROR "):]
-        elif line == "YAAS_DONE":
-            pass
-        elif line:
-            status_cb(line)
+    output_files = []
+    try:
+        for line in proc.stdout:
+            line = line.rstrip("\n")
+            if line.startswith("YAAS_STATUS "):
+                status_cb(line[len("YAAS_STATUS "):])
+            elif line.startswith("YAAS_PROGRESS "):
+                progress_cb(int(line[len("YAAS_PROGRESS "):]))
+            elif line.startswith("YAAS_OUTPUT "):
+                output_files.append(line[len("YAAS_OUTPUT "):])
+            elif line.startswith("YAAS_ERROR "):
+                error_message = line[len("YAAS_ERROR "):]
+            elif line == "YAAS_DONE":
+                pass
+            elif line:
+                status_cb(line)
+    except BaseException:
+        # A callback raised (Worker's do once cancelled): don't leave the
+        # extraction running with no one listening.
+        proc.kill()
+        proc.wait()
+        raise
     proc.wait()
     if error_message:
         raise RuntimeError(error_message)
     if proc.returncode != 0:
         raise RuntimeError(f"GPU extraction subprocess exited with code {proc.returncode}")
+    return output_files

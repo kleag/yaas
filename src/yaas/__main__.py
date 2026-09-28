@@ -2,4 +2,8 @@
 
 
 from .app import main
-main()
+
+# Guarded: the separation's child processes (see local_extraction.py)
+# re-import the main module, and must not start another app.
+if __name__ == "__main__":
+    main()

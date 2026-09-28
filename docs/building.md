@@ -13,9 +13,21 @@ python -m yaas
 yaas
 ```
 
+## Testing
+
+The tests use pytest, and need no network access nor display:
+
+```bash
+uv pip install --group dev
+pytest
+```
+
+`YAAS_SLOW_TESTS=1 pytest` also runs a real OpenUnmix separation, which
+downloads its model on first use.
+
 ## Linting
 
-CI runs flake8 the same way you can locally:
+CI runs flake8, then the tests, the same way you can locally:
 
 ```bash
 flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
@@ -31,8 +43,6 @@ which keeps `pyproject.toml`, `src/yaas/__init__.py`, `README.md`, and
 ```bash
 git commit
 bumpver update --patch   # or --minor / --major
-uv build
-uv publish
 ```
 
 Pushing the version tag that `bumpver` creates triggers the release

@@ -48,15 +48,18 @@ including GPU acceleration.
 Start Yaas from your applications menu, or with `yaas` in a terminal when
 installed from PyPI. Then:
 
-1. navigate to a YouTube video in the integrated browser,
+1. navigate to a YouTube video or playlist in the integrated browser,
 2. click **Start** and wait: separation can take a while, especially on CPU,
-3. find the stems in the output folder, `$HOME/yaas_tracks` by default.
+3. click the stems listed in the status log, or find them in the output
+   folder, `$HOME/yaas_tracks` by default.
 
-Click **Stop** to interrupt an extraction.
+While a job runs, keep browsing and click **Add to Queue** to split more
+videos afterwards. Click **Stop** to stop the running job.
 
 The ☰ menu gives access to:
 
 - **Settings...**: the output folder and the separation model,
+- **Open Output Folder**,
 - **GPU Acceleration...**: an optional CUDA environment on Windows/Linux, or
   the status of Metal acceleration on Apple Silicon Macs,
 - the documentation, the issue tracker, and the version information.
@@ -79,9 +82,11 @@ These override the settings for a single run:
 
 | Option | Description |
 | --- | --- |
+| `--version` | Print the version and exit |
 | `-o`, `--out DIR` | Output folder |
 | `--backend {audio_separator,openunmix}` | Separation library |
 | `--model {roformer,htdemucs6s}` | Model used with the `audio_separator` backend |
+| `--sample-rate {44100,48000}` | Stems' sample rate |
 
 Please respect the copyright of the videos' authors: if they don't allow
 sharing, keep the extracted stems for your personal use.
@@ -92,8 +97,9 @@ Yaas uses [uv](https://docs.astral.sh/uv/). From a clone of the repository:
 
 ```bash
 uv venv && source .venv/bin/activate
-uv pip install -e .
+uv pip install -e . --group dev
 yaas
+pytest
 ```
 
 Releases are versioned with [bumpver](https://github.com/mbarkhau/bumpver):
@@ -101,12 +107,11 @@ Releases are versioned with [bumpver](https://github.com/mbarkhau/bumpver):
 ```bash
 git commit
 bumpver update --patch   # or --minor / --major
-uv build
-uv publish
 ```
 
-Pushing the resulting version tag makes GitHub Actions build the Windows,
-macOS, and Linux packages and attach them to a GitHub Release. See
+`bumpver` pushes a version tag, which makes GitHub Actions publish the
+package to PyPI, and build the Windows, macOS, and Linux packages and attach
+them to a GitHub Release. See
 [Building & Releasing](https://kleag.github.io/yaas/building/) for building
 them locally.
 

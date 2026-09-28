@@ -34,11 +34,12 @@ def set_output_dir(path):
 
 
 # Separation models offered in the Settings dialog, as
-# key -> (label, backend, audio_separator model). The key is what's stored.
+# key -> (label, backend, audio_separator model or None). The key is what's
+# stored.
 MODELS = {
     "roformer": ("BS-Roformer", "audio_separator", "roformer"),
     "htdemucs6s": ("HTDemucs 6 stems", "audio_separator", "htdemucs6s"),
-    "openunmix": ("OpenUnmix", "openunmix", "roformer"),
+    "openunmix": ("OpenUnmix", "openunmix", None),
 }
 _KEY_MODEL = "model"
 _DEFAULT_MODEL = "roformer"
@@ -52,4 +53,28 @@ def get_model():
 def set_model(model):
     settings = _settings()
     settings.setValue(_KEY_MODEL, model)
+    settings.sync()
+
+
+# Sample rates the stems can be written at, as Hz -> label. The models
+# work at 44.1 kHz; 48 kHz stems are resampled afterwards.
+SAMPLE_RATES = {
+    44100: "44.1 kHz",
+    48000: "48 kHz",
+}
+_KEY_SAMPLE_RATE = "sample_rate"
+_DEFAULT_SAMPLE_RATE = 48000
+
+
+def get_sample_rate():
+    try:
+        rate = int(_settings().value(_KEY_SAMPLE_RATE, _DEFAULT_SAMPLE_RATE))
+    except (TypeError, ValueError):
+        return _DEFAULT_SAMPLE_RATE
+    return rate if rate in SAMPLE_RATES else _DEFAULT_SAMPLE_RATE
+
+
+def set_sample_rate(rate):
+    settings = _settings()
+    settings.setValue(_KEY_SAMPLE_RATE, int(rate))
     settings.sync()

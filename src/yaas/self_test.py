@@ -19,6 +19,7 @@ import traceback
 import urllib.request
 
 from . import __version__
+from . import local_extraction
 from . import separate_worker
 
 AUDIO_SEPARATOR_ARCHITECTURES = [
@@ -93,6 +94,12 @@ def _check_soundfile_roundtrip():
             soundfile.read(path)
 
 
+def _check_child_process():
+    # The separation runs in a child process (local_extraction.py), which a
+    # frozen app can only start with multiprocessing.freeze_support().
+    return local_extraction.check_child_process()
+
+
 def run(report_path=None):
     # ffmpeg is bundled only in the macOS app; the Windows installer and the
     # AppImage still rely on a system-wide install, so there it's a warning.
@@ -109,6 +116,7 @@ def run(report_path=None):
          ffmpeg_required or bool(shutil.which("ffmpeg"))),
         ("HTTPS certificate verification", _check_https, True),
         ("soundfile FLAC/WAV round trip (OpenUnmix)", _check_soundfile_roundtrip, True),
+        ("separation child process", _check_child_process, True),
     ]
     lines = [f"Yaas {__version__} self-test ({sys.platform}, "
              f"frozen={getattr(sys, 'frozen', False)})"]

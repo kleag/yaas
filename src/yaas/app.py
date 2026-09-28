@@ -1,4 +1,6 @@
 import argparse
+import html
+import multiprocessing
 import os
 import subprocess
 import sys
@@ -65,24 +67,27 @@ def _setup_ssl_certificates():
 
 _setup_ssl_certificates()
 
-from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
+from PySide6.QtWidgets import (QApplication, QWidget, QVBoxLayout,
                                QHBoxLayout, QLabel, QLineEdit, QPushButton,
-                               QTextEdit, QMessageBox, QSizePolicy,
+                               QTextBrowser, QMessageBox, QSizePolicy,
                                QProgressBar, QToolButton, QMenu, QDialog,
                                QFormLayout, QDialogButtonBox, QFileDialog,
-                               QComboBox)
-from PySide6.QtCore import (Qt, QStandardPaths, QThread, QUrl, Signal, Slot)
-from PySide6.QtGui import QDesktopServices, QIcon
+                               QComboBox, QListWidget, QListWidgetItem,
+                               QSplitter, QStyle)
+from PySide6.QtCore import (Qt, QSize, QStandardPaths, QThread, QUrl, Signal, Slot)
+from PySide6.QtGui import (QDesktopServices, QIcon, QPixmap, QTextCharFormat,
+                           QTextCursor)
 
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings
 from PySide6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
-from typing import NoReturn
 
+from yturl2mp3.helpers import is_valid_playlist_url, is_valid_video_url
 from . import __version__
 from . import gpu_env
 from . import settings
-from .worker import Worker
+from .jobs import Job, JobQueue, QUEUED, RUNNING, page_title_to_job_title
+from .worker import CANCELLED, DONE, FAILED, clean_work_root
 
 DOCUMENTATION_URL = "https://kleag.github.io/yaas/"
 ISSUES_URL = "https://github.com/kleag/yaas/issues"
@@ -155,6 +160,13 @@ class SettingsDialog(QDialog):
             self.model_combo.findData(settings.get_model()))
         form.addRow("Separation model:", self.model_combo)
 
+        self.sample_rate_combo = QComboBox()
+        for rate, label in settings.SAMPLE_RATES.items():
+            self.sample_rate_combo.addItem(label, rate)
+        self.sample_rate_combo.setCurrentIndex(
+            self.sample_rate_combo.findData(settings.get_sample_rate()))
+        form.addRow("Stems sample rate:", self.sample_rate_combo)
+
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.save)
         buttons.rejected.connect(self.reject)
@@ -174,25 +186,100 @@ class SettingsDialog(QDialog):
     def save(self):
         settings.set_output_dir(self.output_dir)
         settings.set_model(self.model_combo.currentData())
+        settings.set_sample_rate(self.sample_rate_combo.currentData())
         self.accept()
 
 
+STOP_BUTTON_STYLE = """
+QPushButton {
+    background-color: #c62828; color: white; font-weight: bold;
+    border: none; border-radius: 4px; padding: 6px 16px;
+}
+QPushButton:hover { background-color: #b71c1c; }
+QPushButton:disabled { background-color: #e57373; }
+"""
+
+JOB_STATE_LABELS = {
+    QUEUED: "Queued",
+    RUNNING: "Running",
+    DONE: "Done",
+    FAILED: "Failed",
+    CANCELLED: "Stopped",
+}
+
+
+def parse_args() -> argparse.Namespace:
+    """
+    Parse the command line arguments. Unknown ones are left for Qt.
+
+    :return: The parsed argument namespace
+    """
+    parser = argparse.ArgumentParser(
+        prog="yaas",
+        description="Yaas (Yet Another Audio Splitter): splits the soundtrack "
+                    "of YouTube videos into separate stems.")
+
+    parser.add_argument(
+        '--version', action='version', version=f"%(prog)s {__version__}")
+
+    parser.add_argument(
+        '-o', '--out', metavar="DIR", type=str,
+        default=None,
+        help="The directory in which to write the stems. "
+             "Overrides the Settings dialog's output folder for this run "
+             "only; defaults to it if not given.")
+
+    parser.add_argument(
+        '--backend', metavar="BACKEND", type=str,
+        default=None,
+        choices=["audio_separator", "openunmix"],
+        help="The backend to use for track separation (openunmix, "
+             "audio_separator). Overrides the Settings dialog's model "
+             "for this run only; defaults to it if not given.")
+
+    parser.add_argument(
+        '--model', metavar="MODEL", type=str,
+        default=None,
+        choices=["roformer", "htdemucs6s"],
+        help="The model to use with audio_separator backend (roformer, "
+             "htdemucs6s). Overrides the Settings dialog's model for "
+             "this run only; defaults to it if not given.")
+
+    parser.add_argument(
+        '--sample-rate', metavar="HZ", type=int,
+        default=None,
+        choices=list(settings.SAMPLE_RATES),
+        help="The stems' sample rate (%(choices)s). Overrides the Settings "
+             "dialog's sample rate for this run only; defaults to it if "
+             "not given.")
+
+    return parser.parse_known_args()[0]
+
+
 class MainWindow(QWidget):
-    def __init__(self):
+    def __init__(self, args):
         super().__init__()
-        initial_url= "https://www.youtube.com"
-        self.args = self.parse_args()
+        initial_url = "https://www.youtube.com"
+        self.args = args
         if not self.args.out:
             self.args.out = settings.get_output_dir()
+        if not self.args.sample_rate:
+            self.args.sample_rate = settings.get_sample_rate()
         # --backend/--model override the Settings dialog's model for this
         # run only, like --out does for the output folder.
         if self.args.backend is None and self.args.model is None:
             self.apply_model_setting()
         else:
             self.args.backend = self.args.backend or "audio_separator"
-            self.args.model = self.args.model or "roformer"
+            if self.args.backend == "openunmix":
+                self.args.model = None
+            else:
+                self.args.model = self.args.model or "roformer"
 
-        self.setWindowTitle("YouTube Audio Splitter")
+        # No job runs yet: remove what a crashed run left behind.
+        clean_work_root()
+
+        self.setWindowTitle("Yaas - Yet Another Audio Splitter")
         self.setWindowIcon(QIcon(icon_path()))
         self.setGeometry(100, 100, 1024, 768)
 
@@ -211,9 +298,11 @@ class MainWindow(QWidget):
         self.gpu_env_dir = os.path.join(
             QStandardPaths.writableLocation(QStandardPaths.AppDataLocation),
             gpu_env.GPU_ENV_DIRNAME)
+        self.gpu_install_thread = None
 
         self.main_menu = QMenu(self.menu_button)
         self.main_menu.addAction("Settings...", self.open_settings_dialog)
+        self.main_menu.addAction("Open Output Folder", self.open_output_folder)
         self.main_menu.addSeparator()
         self.main_menu.addAction("Documentation", self.open_documentation)
         self.main_menu.addAction("Report an Issue", self.open_issues)
@@ -244,35 +333,74 @@ class MainWindow(QWidget):
         self.browser.setUrl(initial_url)
         self.browser.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.browser.urlChanged.connect(self.update_line_edit)
-        self.layout.addWidget(self.browser)
 
         self.start_button = QPushButton("Start")
+        self.start_button.setToolTip(
+            "Split the soundtrack of the video or playlist shown above. "
+            "While a job runs, this queues another one.")
         self.start_button.clicked.connect(self.start_process)
-        self.layout.addWidget(self.start_button)
 
         self.stop_button = QPushButton("Stop")
+        self.stop_button.setToolTip("Stop the running job. Queued jobs then go on.")
+        self.stop_button.setStyleSheet(STOP_BUTTON_STYLE)
         self.stop_button.clicked.connect(self.stop_process)
-        self.layout.addWidget(self.stop_button)
         self.stop_button.hide()
+
+        buttons = QHBoxLayout()
+        buttons.addWidget(self.start_button, 1)
+        buttons.addWidget(self.stop_button)
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.layout.addWidget(self.progress_bar)
         self.progress_bar.hide()
 
-        self.status_output = QTextEdit()
-        self.status_output.setReadOnly(True)
-        self.status_output.setFixedHeight(70)  # Approximately 3 lines
-        self.layout.addWidget(self.status_output)
+        self.job_list = QListWidget()
+        self.job_list.setIconSize(QSize(16, 16))
+        self.job_list.setToolTip("Jobs. Right-click for actions; double-click "
+                                 "a finished job to open its output folder.")
+        self.job_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.job_list.customContextMenuRequested.connect(self.show_job_menu)
+        self.job_list.itemDoubleClicked.connect(self.job_double_clicked)
+        self.job_items = {}
+
+        # A QTextBrowser, for its clickable links to the written stems.
+        self.status_output = QTextBrowser()
+        self.status_output.setOpenLinks(False)
+        self.status_output.anchorClicked.connect(QDesktopServices.openUrl)
+
+        log_panel = QSplitter(Qt.Horizontal)
+        log_panel.addWidget(self.job_list)
+        log_panel.addWidget(self.status_output)
+        log_panel.setStretchFactor(0, 1)
+        log_panel.setStretchFactor(1, 2)
+
+        bottom = QWidget()
+        bottom_layout = QVBoxLayout(bottom)
+        bottom_layout.setContentsMargins(0, 0, 0, 0)
+        bottom_layout.addLayout(buttons)
+        bottom_layout.addWidget(self.progress_bar)
+        bottom_layout.addWidget(log_panel)
+
+        splitter = QSplitter(Qt.Vertical)
+        splitter.addWidget(self.browser)
+        splitter.addWidget(bottom)
+        splitter.setStretchFactor(0, 1)
+        splitter.setSizes([560, 200])
+        self.layout.addWidget(splitter)
 
         self.setLayout(self.layout)
 
+        self.queue = JobQueue(parent=self)
+        self.queue.job_added.connect(self.job_added)
+        self.queue.job_changed.connect(self.job_changed)
+        self.queue.job_removed.connect(self.job_removed)
+        self.queue.status.connect(self.update_status)
+        self.queue.progress.connect(self.update_progress)
+        self.queue.busy_changed.connect(self.busy_changed)
 
     def setup_persistent_profile(self):
         # Create a custom profile with a persistent storage path
-        storage_path = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
-        storage_path = os.path.realpath(storage_path)
         profile = QWebEngineProfile("yaas", self)
 
         # Optionally, set persistent cookies policy
@@ -284,7 +412,6 @@ class MainWindow(QWidget):
 
         # Set this page for the QWebEngineView
         self.browser.setPage(page)
-
 
     def update_line_edit(self, url):
         # Convert QUrl to string and set the text of QLineEdit
@@ -311,10 +438,20 @@ class MainWindow(QWidget):
             self.apply_model_setting()
             label = settings.MODELS[settings.get_model()][0]
             self.update_status(f"Separation model set to {label}")
+            self.args.sample_rate = settings.get_sample_rate()
+            self.update_status("Stems sample rate set to "
+                               f"{settings.SAMPLE_RATES[self.args.sample_rate]}")
+            if self.queue.busy:
+                self.update_status("Already queued jobs keep their previous settings.")
 
     def apply_model_setting(self):
         _label, self.args.backend, self.args.model = settings.MODELS[
             settings.get_model()]
+
+    def open_output_folder(self, path=None):
+        path = path or self.args.out
+        os.makedirs(path, exist_ok=True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(path))
 
     def open_documentation(self):
         QDesktopServices.openUrl(QUrl(DOCUMENTATION_URL))
@@ -346,9 +483,18 @@ class MainWindow(QWidget):
         box.exec()
 
         clicked = box.clickedButton()
+        if clicked is not install_button and (remove_button is None
+                                              or clicked is not remove_button):
+            return
+        if self.queue.busy:
+            QMessageBox.information(
+                self, "GPU Acceleration",
+                "Please wait for the running jobs to finish, or stop them, "
+                "before changing the GPU acceleration environment.")
+            return
         if clicked == install_button:
             self.confirm_and_install_gpu_env()
-        elif remove_button is not None and clicked == remove_button:
+        else:
             gpu_env.uninstall(self.gpu_env_dir)
             self.update_status("GPU acceleration environment removed.")
 
@@ -378,139 +524,205 @@ class MainWindow(QWidget):
         self.gpu_install_thread.status_update.connect(self.update_status)
         self.gpu_install_thread.finished_ok.connect(self.gpu_install_finished_ok)
         self.gpu_install_thread.failed.connect(self.gpu_install_failed)
+        # Jobs would pick up the half-installed environment.
+        self.start_button.setEnabled(False)
         self.progress_bar.setRange(0, 0)  # indeterminate
-        self.progress_bar.setValue(0)
         self.progress_bar.show()
         self.gpu_install_thread.start()
 
     @Slot()
     def gpu_install_finished_ok(self):
+        self.start_button.setEnabled(True)
         self.progress_bar.hide()
         self.update_status("GPU acceleration environment installed.")
         QMessageBox.information(
             self, "GPU Acceleration",
             "GPU acceleration environment installed. See the status log "
-            "above for whether a CUDA GPU was actually detected.")
+            "for whether a CUDA GPU was actually detected.")
 
     @Slot(str)
     def gpu_install_failed(self, message):
+        self.start_button.setEnabled(True)
         self.progress_bar.hide()
         self.update_status(f"GPU acceleration install failed: {message}")
         QMessageBox.critical(
             self, "GPU Acceleration",
             f"Installing the GPU acceleration environment failed:\n{message}")
 
-    def parse_args(self) -> argparse.Namespace:
-        """
-        Parse the command line arguments
-
-        :return: The parsed argument namespace
-        """
-        description = 'Youtube To MP3 Download Tool'
-        parser = argparse.ArgumentParser(description=description)
-
-        parser.add_argument(
-            '-o', '--out', metavar="DIR", type=str,
-            default=None,
-            help="The directory in which to store the downloaded MP3 files. "
-                 "Overrides the Settings dialog's output folder for this run "
-                 "only; defaults to it if not given.")
-        
-        parser.add_argument(
-            '--backend', metavar="BACKEND", type=str,
-            default=None,
-            choices=["audio_separator", "openunmix"],
-            help="The backend to use for track separation (openunmix, "
-                 "audio_separator). Overrides the Settings dialog's model "
-                 "for this run only; defaults to it if not given.")
-        
-        parser.add_argument(
-            '--model', metavar="MODEL", type=str,
-            default=None,
-            choices=["roformer", "htdemucs6s"],
-            help="The model to use with audio_separator backend (roformer, "
-                 "htdemucs6s). Overrides the Settings dialog's model for "
-                 "this run only; defaults to it if not given.")
-
-        return parser.parse_known_args()[0]
-
     def start_process(self):
-        # url = self.url_input.text()
-        url = self.browser.url().url()
-        if url:
-            self.update_status(f"Splitting sound track of {url}")
-            self.worker = Worker(url, self)
-            self.worker.ex_exit.connect(self.ex_exit)
-            # Change the cursor to busy
-            QApplication.setOverrideCursor(Qt.WaitCursor)
-            self.worker.extraction_done.connect(self.extraction_done)
-            self.worker.extraction_failed.connect(self.extraction_failed)
-            self.worker.progress.connect(self.update_progress)
-            self.progress_bar.setRange(0, 0)  # indeterminate until real progress arrives
-            self.progress_bar.setValue(0)
-            self.progress_bar.show()
-            self.worker.start()
-            self.start_button.hide()
-            self.stop_button.show()
+        url = self.browser.url().toString()
+        if not (is_valid_video_url(url) or is_valid_playlist_url(url)):
+            self.update_status(
+                "Navigate to a YouTube video or playlist first, then click "
+                f"{self.start_button.text()}.")
+            return
+        job = Job(url, page_title_to_job_title(self.browser.title()),
+                  self.args.out, self.args.backend, self.args.model,
+                  self.args.sample_rate)
+        self.update_status(f"Queued {job.title}" if self.queue.busy
+                           else f"Splitting the soundtrack of {job.title}")
+        self.queue.add(job)
 
     def stop_process(self):
-        # Restore the cursor to normal
-        QApplication.restoreOverrideCursor()
-        self.worker.terminate()
-        self.start_button.show()
-        self.stop_button.hide()
-        self.progress_bar.hide()
+        self.stop_button.setEnabled(False)
+        self.stop_button.setText("Stopping...")
+        self.update_status("Stopping after the current step...")
+        self.queue.stop_current()
 
+    @Slot(bool)
+    def busy_changed(self, busy):
+        self.start_button.setText("Add to Queue" if busy else "Start")
+        self.stop_button.setVisible(busy)
+        self.stop_button.setEnabled(True)
+        self.stop_button.setText("Stop")
+        self.progress_bar.setVisible(busy)
+        if busy:
+            self.update_progress(-1)
+
+    @Slot(object)
+    def job_added(self, job):
+        item = QListWidgetItem()
+        item.setData(Qt.UserRole, job)
+        self.job_list.addItem(item)
+        self.job_items[job] = item
+        self.render_job(job)
+
+    @Slot(object)
+    def job_removed(self, job):
+        item = self.job_items.pop(job)
+        self.job_list.takeItem(self.job_list.row(item))
+
+    @Slot(object)
+    def job_changed(self, job):
+        self.render_job(job)
+        if job.state == DONE:
+            self.update_status(f"Done: {job.title}"
+                               + (f" ({job.message})" if job.message else "")
+                               + ". Stems written to:")
+            for path in job.outputs:
+                self.append_link(path)
+            if not job.outputs:
+                self.append_link(job.out_dir)
+        elif job.state == FAILED:
+            print(f"Extraction failed: {job.message}", file=sys.stderr)
+            self.update_status(f"Failed: {job.title}: {job.message}")
+        elif job.state == CANCELLED:
+            self.update_status(f"Stopped: {job.title}")
+
+    def render_job(self, job):
+        item = self.job_items[job]
+        text = f"{JOB_STATE_LABELS[job.state]}: {job.title}"
+        if job.finished and job.message:
+            text += f" ({job.message})"
+        item.setText(text)
+        tooltip = [job.url, f"Output folder: {job.out_dir}",
+                   f"Backend: {job.backend}" + (f" ({job.model})" if job.model else "")]
+        if job.sample_rate:
+            tooltip.append(f"Sample rate: {job.sample_rate} Hz")
+        tooltip += job.outputs
+        item.setToolTip("\n".join(tooltip))
+        icon = {
+            RUNNING: QStyle.SP_MediaPlay,
+            DONE: QStyle.SP_DialogApplyButton,
+            FAILED: QStyle.SP_MessageBoxCritical,
+            CANCELLED: QStyle.SP_MediaStop,
+        }.get(job.state)
+        if icon is not None:
+            item.setIcon(self.style().standardIcon(icon))
+        else:
+            # A blank icon keeps queued jobs' text aligned with the others'.
+            blank = QPixmap(self.job_list.iconSize())
+            blank.fill(Qt.transparent)
+            item.setIcon(QIcon(blank))
+
+    def show_job_menu(self, pos):
+        item = self.job_list.itemAt(pos)
+        job = item.data(Qt.UserRole) if item else None
+        menu = QMenu(self)
+        if job is not None and job.state == QUEUED:
+            menu.addAction("Remove from Queue", lambda: self.queue.remove(job))
+        if job is not None and job.state == RUNNING:
+            menu.addAction("Stop", self.stop_process)
+        if job is not None and job.finished:
+            menu.addAction("Open Output Folder",
+                           lambda: self.open_output_folder(job.out_dir))
+        if job is not None:
+            menu.addAction("Open in Browser",
+                           lambda: self.browser.setUrl(QUrl(job.url)))
+        if any(j.finished for j in self.queue.jobs):
+            menu.addSeparator()
+            menu.addAction("Clear Finished Jobs", self.queue.clear_finished)
+        if not menu.isEmpty():
+            menu.exec(self.job_list.viewport().mapToGlobal(pos))
+
+    def job_double_clicked(self, item):
+        job = item.data(Qt.UserRole)
+        if job.finished:
+            self.open_output_folder(job.out_dir)
+
+    def _status_cursor(self):
+        cursor = self.status_output.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        if not self.status_output.document().isEmpty():
+            cursor.insertBlock()
+        # Plain text: don't carry a previous link's formatting over.
+        cursor.setCharFormat(QTextCharFormat())
+        return cursor
+
+    def _scroll_status_to_end(self):
+        bar = self.status_output.verticalScrollBar()
+        bar.setValue(bar.maximum())
+
+    @Slot(str)
     def update_status(self, message):
-        self.status_output.append(message)
+        # insertText rather than append(): messages are plain text, even
+        # when they happen to look like HTML.
+        self._status_cursor().insertText(message)
+        self._scroll_status_to_end()
 
-    def ex_exit(self, ex: BaseException, exit_code: int = 1) -> NoReturn:
-        """
-        Exit with an exception
-
-        :param ex: The exception being thrown
-        :param exit_code: The exit code of the program
-        """
-        QMessageBox.critical(
-                    self,
-                    "Fatal Error",
-                    f"Exception: {ex}.")
-        sys.exit(exit_code)
+    def append_link(self, path):
+        """Appends a clickable path to the status log."""
+        url = QUrl.fromLocalFile(path).toString()
+        self._status_cursor().insertHtml(
+            f'&nbsp;&nbsp;<a href="{html.escape(url)}">{html.escape(path)}</a>')
+        self._scroll_status_to_end()
 
     @Slot()
     def url_changed(self):
         self.browser.setUrl(self.url_input.text())
 
-    @Slot()
-    def extraction_done(self):
-        # Restore the cursor to normal
-        QApplication.restoreOverrideCursor()
-        self.start_button.show()
-        self.stop_button.hide()
-        self.progress_bar.hide()
-
-        # Optional: Notify the user that the operation has finished
-        self.update_status("Extraction done")
-
-    @Slot()
-    def extraction_failed(self, message: str):
-        # Restore the cursor to normal
-        QApplication.restoreOverrideCursor()
-        self.start_button.show()
-        self.stop_button.hide()
-        self.progress_bar.hide()
-
-        # Optional: Notify the user that the operation has finished
-        print(f"Extraction failed: {message}", file=sys.stderr)
-        self.update_status(f"Extraction failed: {message}")
-
     @Slot(int)
     def update_progress(self, value):
-        if self.progress_bar.maximum() == 0:
-            # Switch out of indeterminate/busy mode once real progress arrives.
+        if value < 0:
+            self.progress_bar.setRange(0, 0)  # busy, no estimate
+        else:
             self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(value)
+            self.progress_bar.setValue(value)
 
+    def closeEvent(self, event):
+        gpu_installing = (self.gpu_install_thread is not None
+                          and self.gpu_install_thread.isRunning())
+        if not (self.queue.busy or gpu_installing):
+            event.accept()
+            return
+        answer = QMessageBox.question(
+            self, "Quit Yaas?",
+            ("The GPU acceleration environment is still being installed."
+             if gpu_installing else
+             "A job is still running. It will be stopped, and the queued "
+             "jobs dropped.")
+            + " Quit anyway?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer != QMessageBox.Yes:
+            event.ignore()
+            return
+        if gpu_installing or not self.queue.shutdown(10000):
+            # A step that can't be interrupted (or the GPU install) is still
+            # running, and Qt aborts when a running QThread is destroyed.
+            # Leave right away instead; the job's intermediate files are
+            # cleaned up on the next start.
+            os._exit(0)
+        event.accept()
 
     def check_ffmpeg(self):
         # Try to call ffmpeg and capture the result
@@ -538,6 +750,10 @@ class MainWindow(QWidget):
 
 
 def main():
+    # Runs, and exits, when this process is one of the separation's child
+    # processes in a frozen app (see local_extraction.py). pyinstmain.py
+    # calls it already, sooner; this covers other frozen entry points.
+    multiprocessing.freeze_support()
     if "--self-test" in sys.argv:
         # Headless packaging smoke test, run by release.yml on each built
         # installer; see self_test.py.
@@ -545,6 +761,8 @@ def main():
         i = sys.argv.index("--self-test")
         report = sys.argv[i + 1] if len(sys.argv) > i + 1 else None
         sys.exit(self_test.run(report))
+    # Before creating any window, so --help and --version just print.
+    args = parse_args()
     # 1. Platform-Specific Fixes
     if sys.platform.startswith("linux"):
         # Only force X11/xcb on Linux to bypassWayland Chromium bugs
@@ -572,7 +790,7 @@ def main():
     app = QApplication(sys.argv)
     app.setWindowIcon(QIcon(icon_path()))
 
-    main_window = MainWindow()
+    main_window = MainWindow(args)
     main_window.check_ffmpeg()
     main_window.show()
 

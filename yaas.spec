@@ -97,7 +97,7 @@ a = Analysis(
     # its submodules rather than chasing individual subpackages one crash
     # at a time.
     hiddenimports=(['PySide6', 'pytubefix', 'pydub', 'torch', 'torchaudio', 'torchcodec',
-                    'openunmix', 'audioop', 'ffmpeg', 'soundfile', 'audioread']
+                    'openunmix', 'audioop', 'soundfile', 'audioread']
                    + collect_submodules('audio_separator')),
     hookspath=[],
     runtime_hooks=[],

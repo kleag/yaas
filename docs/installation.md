@@ -75,9 +75,15 @@ hardware. The macOS installer is different: see
 [GPU acceleration on macOS](#gpu-acceleration-on-macos) below.
 
 Installing via `uv pip install yaas` / `pip install yaas` instead pulls the
-regular PyPI PyTorch build, which automatically uses a compatible CUDA GPU
-when one is available and falls back to CPU otherwise — no configuration
-needed.
+regular PyPI PyTorch build. On Linux, it automatically uses a compatible CUDA
+GPU when one is available and falls back to CPU otherwise. On Windows, PyPI's
+PyTorch is CPU-only: install a CUDA build from
+[PyTorch's own index](https://pytorch.org/get-started/locally/) into the same
+environment, for example:
+
+```bash
+uv pip install torch torchaudio torchvision torchcodec --index-url https://download.pytorch.org/whl/cu126
+```
 
 ### Enabling GPU acceleration in the Windows/Linux installers
 
@@ -88,6 +94,10 @@ Python environment with CUDA-enabled PyTorch (several GB) that Yaas then uses
 automatically for extraction whenever it's present. Use the same menu entry
 later to check its status, reinstall it (e.g. after upgrading Yaas), or
 remove it.
+
+Yaas installs the CUDA 12.6 build of PyTorch, which supports the widest range
+of NVIDIA GPUs and drivers, or the CUDA 13 build when `nvidia-smi` reports a
+Blackwell GPU (RTX 50xx), which needs it (and an NVIDIA driver 580 or newer).
 
 ### GPU acceleration on macOS
 

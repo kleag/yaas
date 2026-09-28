@@ -5,14 +5,10 @@ __version__ = "0.4.1"
 import sys
 import os
 import argparse
-import colorama
-from colorama import Fore
 from typing import NoReturn
 from .config import Config
-from .helpers import convert_mp4_to_mp3, download_mp3, is_valid_playlist_url, is_valid_video_url
+from .helpers import convert_mp4_to_mp3, download_audio, is_valid_playlist_url, is_valid_video_url
 from pytubefix import YouTube, Playlist
-
-colorama.init()
 
 
 def main() -> None:
@@ -32,7 +28,7 @@ def main() -> None:
             log_info('Single YouTube video Detected. Initializing...')
 
             video = YouTube(url)
-            path = download_mp3(video, config)
+            path = download_audio(video, config)
             
             log_info('Converting video to MP3 File...')
             
@@ -44,7 +40,7 @@ def main() -> None:
             
             playlist = Playlist(url)
             for video in playlist.videos:
-                path = download_mp3(video, config)
+                path = download_audio(video, config)
 
                 log_info('Converting video to MP3 File...')
                 
@@ -64,7 +60,7 @@ def log_info(msg: str) -> None:
 
     :param msg: The message to log
     """
-    print(Fore.YELLOW, '[youtube-to-mp3] ', Fore.BLUE, msg, sep="")
+    print('[youtube-to-mp3] ', msg, sep="")
 
 
 def ex_exit(ex: BaseException, exit_code: int = 1) -> NoReturn:
@@ -74,7 +70,7 @@ def ex_exit(ex: BaseException, exit_code: int = 1) -> NoReturn:
     :param ex: The exception being thrown
     :param exit_code: The exit code of the program
     """
-    print(Fore.YELLOW, '[youtube-to-mp3] ', Fore.RED, ex.__class__.__name__, Fore.YELLOW, ': ', ex,
+    print('[youtube-to-mp3] ', ex.__class__.__name__, ': ', ex,
           file=sys.stderr, sep='')
     sys.exit(exit_code)
 
@@ -85,7 +81,7 @@ def parse_args() -> argparse.Namespace:
 
     :return: The parsed argument namespace
     """
-    description = Fore.YELLOW + 'Youtube To MP3 Download Tool'
+    description = 'Youtube To MP3 Download Tool'
     parser = argparse.ArgumentParser(description=description)
 
     parser.add_argument('url', metavar='URL', type=str,

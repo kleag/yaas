@@ -9,8 +9,21 @@ from pytubefix import YouTube
 
 YOUTUBE_URL = 'https://www.youtube.com'
 
+# www., m. and music.youtube.com, and country domains such as youtube.fr or
+# youtube.co.uk.
+_YOUTUBE_HOST = r'https?://(?:(?:www|m|music)\.)?youtube\.[a-z]{2,3}(?:\.[a-z]{2})?'
+_VIDEO_ID = r'[A-Za-z0-9_-]{11}'
+_VIDEO_URL_PATTERNS = [
+    # watch?v=ID, possibly after other parameters (watch?app=desktop&v=ID)
+    re.compile(rf'^{_YOUTUBE_HOST}/watch\?(?:[^#]*&)?v={_VIDEO_ID}'),
+    re.compile(rf'^{_YOUTUBE_HOST}/(?:shorts|live|embed)/{_VIDEO_ID}'),
+    re.compile(rf'^https?://youtu\.be/{_VIDEO_ID}'),
+]
+_PLAYLIST_URL_PATTERN = re.compile(
+    rf'^{_YOUTUBE_HOST}/playlist\?(?:[^#]*&)?list=[A-Za-z0-9_-]+')
 
-def download_mp3(video: YouTube, config: Config) -> str:
+
+def download_audio(video: YouTube, config: Config) -> str:
     """
     Downloads the audio of a YouTube video.
 
@@ -28,10 +41,13 @@ def download_mp3(video: YouTube, config: Config) -> str:
         raise RuntimeError(
             f"No downloadable audio or video stream found for {video.watch_url}")
 
+    # Not skip_existing: an interrupted download leaves a partial file
+    # behind, which would then be taken for a complete one.
     path_to_saved = stream.download(
         output_path=config.out_dir, timeout=config.timeout,
-        max_retries=config.max_retries,
-        skip_existing=True)
+        max_retries=config.max_retries)
+    if not path_to_saved:
+        raise RuntimeError(f"Downloading {video.watch_url} was interrupted")
     return os.path.realpath(path_to_saved)
 
 
@@ -55,22 +71,33 @@ def convert_mp4_to_mp3(path: str, delete_after: bool = True) -> str:
     return mp3_path
 
 
+def convert_to_flac(path: str, flac_path: str) -> str:
+    """
+    Decodes a downloaded audio/video file (e.g. m4a) straight to a lossless
+    FLAC file, without an intermediate lossy (mp3) encoding.
+
+    :param path: The path of the downloaded file
+    :param flac_path: The path of the FLAC file to write
+    :return: flac_path
+    """
+    AudioSegment.from_file(path).export(flac_path, format="flac")
+    return flac_path
+
+
 def is_valid_video_url(url: str) -> bool:
     """
     Determines if the url is a valid YouTube video link
 
-    Example of a valid url:
+    Examples of valid urls:
         `https://www.youtube.<COUNTRY_CODE>/watch?v=<VIDEO_ID>`
+        `https://www.youtube.com/shorts/<VIDEO_ID>`
+        `https://youtu.be/<VIDEO_ID>`
 
     :param url: The url pointing to the YouTube video
     :return: True if the url is valid, otherwise false
     """
-    # return None is not re.match('https:\/\/www\.youtube\.[a-z]{2,}\/watch\?v=([A-Za-z0-9-_\&]+)', url)
-    # 1. We anchor the end ($) so extra parameters don't break the logic
-    # 2. We limit the video ID to exactly 11 characters {11}
-    pattern = r'^https://www\.youtube\.[a-z]{2,}/watch\?v=([A-Za-z0-9_-]{11})'
+    return any(pattern.match(url) for pattern in _VIDEO_URL_PATTERNS)
 
-    return bool(re.match(pattern, url))
 
 def is_valid_playlist_url(url: str) -> bool:
     """
@@ -82,7 +109,4 @@ def is_valid_playlist_url(url: str) -> bool:
     :param url: The url to validate
     :return: True if the url is valid, otherwise false.
     """
-    # return None is not re.match('https:\/\/www\.youtube\.[a-z]{2,}\/playlist\?list=([A-Za-z0-9-_\&]+)', url)
-    pattern = r'^https://www\.youtube\.[a-z]{2,}/playlist\?list=([A-Za-z0-9-_\&]+)'
-
-    return bool(re.match(pattern, url))
+    return bool(_PLAYLIST_URL_PATTERN.match(url))

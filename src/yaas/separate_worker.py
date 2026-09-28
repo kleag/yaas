@@ -14,9 +14,10 @@ import logging
 import os
 import sys
 
+import numpy
 import soundfile
+import soxr
 import torch
-import openunmix
 from openunmix.predict import separate
 
 # Full traceback of a failed audio_separator import, or None. Surfaced in
@@ -66,8 +67,8 @@ def _torch_device():
 
 
 def extract_with_openunmix(flac_path, out_dir, status_cb, progress_cb):
+    """Returns the paths of the written stems."""
     status_cb(f"Extracting tracks from flac {flac_path} with OpenUnmix...")
-    model = openunmix.umxl()  # noqa: F841 (loaded for its side effect of caching weights)
 
     # soundfile rather than torchaudio.load/save: recent torchaudio routes
     # both through torchcodec, which needs FFmpeg's *shared libraries* at
@@ -75,33 +76,38 @@ def extract_with_openunmix(flac_path, out_dir, status_cb, progress_cb):
     # the ffmpeg program), whereas soundfile's libsndfile is bundled.
     data, sample_rate = soundfile.read(flac_path, dtype="float32", always_2d=True)
     waveform = torch.from_numpy(data.T)  # (channels, frames), as torchaudio did
-    waveform = waveform.mean(dim=0, keepdim=True)  # Convert to mono
-    status_cb(f"Loaded audio at: {sample_rate}MHz")
+    status_cb(f"Loaded audio at {sample_rate} Hz")
 
+    # separate() resamples to the model's own rate (44.1 kHz) from `rate`,
+    # so it must be the file's actual rate.
     device = _torch_device()
     status_cb(f"Running OpenUnmix on {device}")
     try:
-        estimates = separate(waveform, rate=44100, device=device)
+        estimates = separate(waveform, rate=sample_rate, device=device)
     except (RuntimeError, NotImplementedError) as ex:
         # MPS in particular doesn't implement every op OpenUnmix's STFT and
         # Wiener filtering use, and GPU memory can run out on long tracks.
         if device == "cpu":
             raise
         status_cb(f"OpenUnmix failed on {device} ({ex}); retrying on CPU...")
-        estimates = separate(waveform, rate=44100, device="cpu")
+        estimates = separate(waveform, rate=sample_rate, device="cpu")
 
+    # The estimates are at the model's rate, not necessarily the input's.
+    model_rate = 44100
+    file_name = os.path.splitext(os.path.basename(flac_path))[0]
+    output_files = []
     for source, estimate in estimates.items():
-        file_name = os.path.splitext(os.path.basename(flac_path))[0]
         wav_path = os.path.join(out_dir, f"{file_name}_{source}.wav")
-        status_cb(f'Writing result to {wav_path}')
-        # soundfile wants (frames, channels); .T is a no-op on mono.
-        soundfile.write(wav_path, torch.squeeze(estimate).to("cpu").numpy().T,
-                        sample_rate)
-        status_cb(f'Wrote {source} to {wav_path}')
+        status_cb(f'Writing {source} to {wav_path}')
+        # soundfile wants (frames, channels); estimate is (1, channels, frames).
+        soundfile.write(wav_path, estimate[0].to("cpu").numpy().T, model_rate)
+        output_files.append(wav_path)
+    return output_files
 
 
 def extract_with_audio_separator(flac_path, out_dir, model_type, status_cb, progress_cb,
                                  model_dir=None):
+    """Returns the paths of the written stems."""
     status_cb(f"Extracting tracks from flac {flac_path} with {model_type}...")
     if not HAS_AUDIO_SEPARATOR:
         raise RuntimeError(audio_separator_unavailable_message())
@@ -122,16 +128,60 @@ def extract_with_audio_separator(flac_path, out_dir, model_type, status_cb, prog
         os.makedirs(model_dir, exist_ok=True)
         separator_kwargs["model_file_dir"] = model_dir
     separator = Separator(**separator_kwargs)
+    _make_model_downloads_atomic(separator)
 
     model_filename = MODEL_MAP.get(model_type, "BS-Roformer-SW.ckpt")
-    separator.load_model(model_filename=model_filename)
-
-    # Separate audio, reporting progress through progress_cb instead of the
-    # ASCII tqdm bar audio_separator draws on the terminal.
+    # Report the model download (several hundred MB on first use) and the
+    # separation itself through progress_cb instead of the ASCII tqdm bars
+    # audio_separator draws on the terminal.
     with _redirect_separator_progress(progress_cb, status_cb):
+        status_cb(f"Loading model {model_filename} (downloaded on first use)...")
+        separator.load_model(model_filename=model_filename)
+        status_cb("Separating...")
         output_files = separator.separate(flac_path)
 
-    status_cb(f"Separation complete. Generated files: {output_files}")
+    # Depending on the architecture, these are bare file names in out_dir.
+    return [f if os.path.isabs(f) else os.path.join(out_dir, f) for f in output_files]
+
+
+def resample_wav(path, rate):
+    """Resamples the WAV file at path to rate, in place, keeping its sample
+    format. The models work at 44.1 kHz, but some DAWs (and 48 kHz
+    sessions) would otherwise have to resample every imported stem.
+    Returns whether the file was changed."""
+    info = soundfile.info(path)
+    if info.samplerate == rate:
+        return False
+    data, _ = soundfile.read(path, dtype="float32", always_2d=True)
+    data = soxr.resample(data, info.samplerate, rate, quality="VHQ")
+    if info.subtype.startswith("PCM"):
+        # Resampling can overshoot full scale a little; integer formats
+        # would wrap around rather than clip.
+        data = numpy.clip(data, -1.0, 1.0)
+    tmp_path = path + ".resampling.wav"
+    soundfile.write(tmp_path, data, rate, subtype=info.subtype)
+    os.replace(tmp_path, path)
+    return True
+
+
+def _make_model_downloads_atomic(separator):
+    """audio_separator only checks that a model file exists before using it,
+    so a download interrupted by Stop (which kills this process) would leave
+    a truncated model that fails every later run. Download to a .part file
+    and only rename it once complete. (OpenUnmix's models come through
+    torch.hub, which already does this.)"""
+    original = separator.download_file_if_not_exists
+
+    def download_file_if_not_exists(url, output_path):
+        if os.path.isfile(output_path):
+            return original(url, output_path)
+        part_path = output_path + ".part"
+        if os.path.exists(part_path):
+            os.remove(part_path)
+        original(url, part_path)
+        os.replace(part_path, output_path)
+
+    separator.download_file_if_not_exists = download_file_if_not_exists
 
 
 @contextlib.contextmanager
@@ -164,6 +214,8 @@ def _redirect_separator_progress(progress_cb, status_cb):
     # onnx2torch/torchvision) that may not be usable in every environment,
     # and that must not prevent patching (or using) the others.
     module_specs = [
+        # Model downloads (download_file_if_not_exists).
+        ("audio_separator.separator.separator", "tqdm", lambda m: _ProgressTqdm),
         ("audio_separator.separator.architectures.mdx_separator", "tqdm", lambda m: _ProgressTqdm),
         ("audio_separator.separator.architectures.mdxc_separator", "tqdm", lambda m: _ProgressTqdm),
         ("audio_separator.separator.architectures.vr_separator", "tqdm", lambda m: _ProgressTqdm),
@@ -194,15 +246,43 @@ def _redirect_separator_progress(progress_cb, status_cb):
         for mod, attr, original in originals:
             setattr(mod, attr, original)
         devnull.close()
-        progress_cb(0)
 
 
 def extract(flac_path, out_dir, backend, model, status_cb, progress_cb, model_dir=None):
+    """Returns the paths of the written stems."""
     if backend == "audio_separator":
-        extract_with_audio_separator(flac_path, out_dir, model, status_cb, progress_cb,
-                                     model_dir=model_dir)
+        return extract_with_audio_separator(flac_path, out_dir, model, status_cb, progress_cb,
+                                            model_dir=model_dir)
+    return extract_with_openunmix(flac_path, out_dir, status_cb, progress_cb)
+
+
+def child_main(conn, flac_path, out_dir, backend, model, model_dir):
+    """Entry point of the child process yaas.local_extraction runs the
+    separation in. Reports through conn, the write end of a Pipe:
+    ("status", str), ("progress", int), then ("done", [stem paths]) or
+    ("error", str)."""
+    def status_cb(message):
+        conn.send(("status", message))
+
+    def progress_cb(value):
+        conn.send(("progress", value))
+
+    try:
+        output_files = extract(flac_path, out_dir, backend, model,
+                               status_cb, progress_cb, model_dir=model_dir)
+    except BaseException as ex:
+        conn.send(("error", str(ex) or ex.__class__.__name__))
     else:
-        extract_with_openunmix(flac_path, out_dir, status_cb, progress_cb)
+        conn.send(("done", output_files))
+    finally:
+        conn.close()
+
+
+def child_ping(conn):
+    """Trivial child process, for `yaas --self-test`: checks that the frozen
+    app can start one at all (it needs multiprocessing.freeze_support())."""
+    conn.send(("done", [sys.executable]))
+    conn.close()
 
 
 def _cli_main():
@@ -226,11 +306,13 @@ def _cli_main():
         print(f"YAAS_PROGRESS {value}", flush=True)
 
     try:
-        extract(args.flac_path, args.out_dir, args.backend, args.model,
-                status_cb, progress_cb, model_dir=args.model_dir)
+        output_files = extract(args.flac_path, args.out_dir, args.backend, args.model,
+                               status_cb, progress_cb, model_dir=args.model_dir)
     except BaseException as ex:
         print(f"YAAS_ERROR {ex.__class__.__name__}: {ex}", flush=True)
         return 1
+    for path in output_files:
+        print(f"YAAS_OUTPUT {path}", flush=True)
     print("YAAS_DONE", flush=True)
     return 0
 
