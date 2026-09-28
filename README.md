@@ -5,7 +5,7 @@
 
 # Yet Another Audio Splitter
 
-This is Yaas 0.12.0, a desktop application that splits the soundtrack of a
+This is Yaas 1.0.0, a desktop application that splits the soundtrack of a
 YouTube video into separate stems (vocals, drums, bass, other, ...), for
 example to practice an instrument over the rest of the band.
 
